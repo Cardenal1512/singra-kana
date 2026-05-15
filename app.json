@@ -25,6 +25,11 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "extra": {
+      "router": {
+        "root": "app"
+      }
+    },
     "plugins": [
       "expo-router",
       [
