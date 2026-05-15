@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 
 import { colors } from '@/src/shared/constants/colors';
+import { radii, softShadow } from '@/src/shared/constants/visualSystem';
 
 type AppButtonProps = {
   label: string;
@@ -25,19 +26,32 @@ export function AppButton({ label, onPress, variant = 'primary' }: AppButtonProp
   );
 }
 
+type WebButtonStyle = ViewStyle & {
+  cursor?: 'pointer';
+  transitionDuration?: string;
+  transitionProperty?: string;
+  transitionTimingFunction?: string;
+};
+
+const webButtonStyle = Platform.select<ViewStyle>({
+  web: {
+    cursor: 'pointer',
+    transitionDuration: '160ms',
+    transitionProperty: 'opacity, transform, box-shadow',
+    transitionTimingFunction: 'ease',
+  } as unknown as WebButtonStyle,
+});
+
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
-    borderRadius: 14,
-    minHeight: 50,
+    borderRadius: radii.pill,
+    minHeight: 52,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 13,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 2,
+    ...softShadow,
+    ...webButtonStyle,
   },
   primaryButton: {
     backgroundColor: colors.primary,
@@ -51,7 +65,7 @@ const styles = StyleSheet.create({
   label: {
     color: colors.onPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   secondaryLabel: {
     color: colors.text,

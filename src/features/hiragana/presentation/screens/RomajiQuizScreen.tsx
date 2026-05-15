@@ -14,7 +14,9 @@ import { checkRomajiAnswer } from '@/src/features/hiragana/application/useCases/
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import { hiraganaSeries } from '@/src/features/hiragana/infrastructure/data/hiraganaSeries';
 import { AppButton } from '@/src/shared/components/AppButton';
+import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
+import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
 
 type RomajiQuizScreenProps = {
@@ -50,8 +52,11 @@ export function RomajiQuizScreen({
 
   if (!series) {
     return (
-      <View style={styles.quizContainer}>
-        <QuizHeader title="Series not found" backLabel={t.common.back} onBack={onBack} />
+      <View style={styles.root}>
+        <KawaiiBackground />
+        <View style={styles.quizContainer}>
+          <QuizHeader title="Series not found" backLabel={t.common.back} onBack={onBack} />
+        </View>
       </View>
     );
   }
@@ -101,68 +106,78 @@ export function RomajiQuizScreen({
 
   if (completed) {
     return (
-      <View style={styles.quizContainer}>
-        <QuizHeader title={t.quiz.title} backLabel={t.common.back} onBack={onBack} />
+      <View style={styles.root}>
+        <KawaiiBackground kana={['正', '答', 'あ']} />
+        <View style={styles.quizContainer}>
+          <QuizHeader title={t.quiz.title} backLabel={t.common.back} onBack={onBack} />
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summary}>
-            {correctCount} / {selectedSeries.characters.length}
-          </Text>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHalo}>
+              <Text style={styles.summary}>
+                {correctCount} / {selectedSeries.characters.length}
+              </Text>
+            </View>
+          </View>
+
+          <AppButton label={t.common.restart} onPress={restartQuiz} />
         </View>
-
-        <AppButton label={t.common.restart} onPress={restartQuiz} />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.quizContainer}>
-      <QuizHeader
-        title={t.quiz.title}
-        subtitle={selectedSeries.title}
-        backLabel={t.common.back}
-        onBack={onBack}
-      />
+    <View style={styles.root}>
+      <KawaiiBackground kana={['ろ', currentCharacter.kana, '字']} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.quizContainer}>
+        <QuizHeader
+          title={t.quiz.title}
+          subtitle={selectedSeries.title}
+          backLabel={t.common.back}
+          onBack={onBack}
+        />
 
-      <View style={styles.quizKanaCard}>
-        <Text style={styles.quizKana}>{currentCharacter.kana}</Text>
-      </View>
-
-      <TextInput
-        ref={inputRef}
-        autoCapitalize="none"
-        autoCorrect={false}
-        blurOnSubmit
-        editable={!checked}
-        onChangeText={setAnswer}
-        onSubmitEditing={checkAnswer}
-        placeholder="Type romaji"
-        placeholderTextColor={colors.disabledText}
-        returnKeyType="done"
-        style={styles.quizInput}
-        value={answer}
-      />
-
-      {checked ? (
-        <View style={[styles.feedbackBadge, isCorrect ? styles.correctBadge : styles.incorrectBadge]}>
-          <Text style={[styles.feedback, isCorrect ? styles.correct : styles.incorrect]}>
-            {isCorrect ? t.quiz.correct : `${t.quiz.correctAnswer}: ${expectedAnswers[0]}`}
-          </Text>
+        <View style={styles.quizKanaCard}>
+          <View style={styles.kanaHalo}>
+            <Text style={styles.quizKana}>{currentCharacter.kana}</Text>
+          </View>
         </View>
-      ) : (
-        <View style={styles.feedbackSpacer} />
-      )}
 
-      <View style={styles.quizActionButton}>
+        <TextInput
+          ref={inputRef}
+          autoCapitalize="none"
+          autoCorrect={false}
+          blurOnSubmit
+          editable={!checked}
+          onChangeText={setAnswer}
+          onSubmitEditing={checkAnswer}
+          placeholder="Type romaji"
+          placeholderTextColor={colors.disabledText}
+          returnKeyType="done"
+          style={styles.quizInput}
+          value={answer}
+        />
+
         {checked ? (
-          <AppButton label={t.common.next} onPress={goToNextCharacter} />
+          <View style={[styles.feedbackBadge, isCorrect ? styles.correctBadge : styles.incorrectBadge]}>
+            <Text style={[styles.feedback, isCorrect ? styles.correct : styles.incorrect]}>
+              {isCorrect ? t.quiz.correct : `${t.quiz.correctAnswer}: ${expectedAnswers[0]}`}
+            </Text>
+          </View>
         ) : (
-          <AppButton label={t.common.check} onPress={checkAnswer} />
+          <View style={styles.feedbackSpacer} />
         )}
-      </View>
-    </KeyboardAvoidingView>
+
+        <View style={styles.quizActionButton}>
+          {checked ? (
+            <AppButton label={t.common.next} onPress={goToNextCharacter} />
+          ) : (
+            <AppButton label={t.common.check} onPress={checkAnswer} />
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -177,7 +192,7 @@ function QuizHeader({ backLabel, title, subtitle, onBack }: QuizHeaderProps) {
   return (
     <View style={styles.quizHeader}>
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.quizBackButton}>
-        <Text style={styles.quizBackText}>{backLabel}</Text>
+        <Text style={styles.quizBackText}>{`← ${backLabel}`}</Text>
       </Pressable>
       <Text style={styles.quizTitle}>{title}</Text>
       {subtitle ? <Text style={styles.quizSubtitle}>{subtitle}</Text> : null}
@@ -186,11 +201,18 @@ function QuizHeader({ backLabel, title, subtitle, onBack }: QuizHeaderProps) {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   quizContainer: {
+    alignSelf: 'center',
     flex: 1,
     gap: 15,
+    justifyContent: 'center',
+    maxWidth: 560,
     padding: 20,
     paddingTop: 12,
+    width: '100%',
   },
   quizHeader: {
     gap: 4,
@@ -199,7 +221,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: radii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -207,50 +229,58 @@ const styles = StyleSheet.create({
   quizBackText: {
     color: colors.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   quizTitle: {
     color: colors.text,
-    fontSize: 27,
+    fontSize: 28,
     fontWeight: '900',
     marginTop: 8,
+    textAlign: 'center',
   },
   quizSubtitle: {
     color: colors.mutedText,
     fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   quizKanaCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 18,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.panel,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 150,
-    paddingVertical: 12,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 18,
-    elevation: 1,
+    minHeight: 210,
+    paddingVertical: 18,
+    ...softShadow,
+  },
+  kanaHalo: {
+    alignItems: 'center',
+    backgroundColor: pastelColors.blue,
+    borderRadius: radii.pill,
+    height: 166,
+    justifyContent: 'center',
+    width: 166,
   },
   quizKana: {
     color: colors.text,
     fontSize: 96,
-    fontWeight: '700',
+    fontWeight: '800',
     lineHeight: 116,
   },
   quizInput: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.card,
     borderWidth: 1,
     color: colors.text,
     fontSize: 22,
-    minHeight: 54,
+    minHeight: 58,
     paddingHorizontal: 14,
     textAlign: 'center',
-    fontWeight: '700',
+    fontWeight: '800',
+    ...softShadow,
   },
   quizActionButton: {
     alignSelf: 'stretch',
@@ -262,15 +292,15 @@ const styles = StyleSheet.create({
   },
   feedbackBadge: {
     alignItems: 'center',
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
-    minHeight: 34,
+    minHeight: 38,
     justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
   feedbackSpacer: {
-    minHeight: 34,
+    minHeight: 38,
   },
   correct: {
     color: colors.success,
@@ -289,16 +319,25 @@ const styles = StyleSheet.create({
   summaryCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 18,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.panel,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 160,
+    minHeight: 220,
     padding: 24,
+    ...softShadow,
+  },
+  summaryHalo: {
+    alignItems: 'center',
+    backgroundColor: pastelColors.mint,
+    borderRadius: radii.pill,
+    height: 150,
+    justifyContent: 'center',
+    width: 150,
   },
   summary: {
     color: colors.text,
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: '900',
   },
 });

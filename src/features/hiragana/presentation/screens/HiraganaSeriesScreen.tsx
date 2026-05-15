@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
+import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
 
@@ -29,6 +30,7 @@ export function HiraganaSeriesScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
+      <KawaiiBackground kana={['ひ', 'ら', 'な']} />
       <View style={[styles.content, { width: gridWidth }]}>
         <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
           <Text style={styles.backText}>{`← ${t.common.back}`}</Text>
@@ -142,6 +144,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: screenPadding,
     paddingTop: 8,
+    position: 'relative',
   },
   content: {
     gap: 8,

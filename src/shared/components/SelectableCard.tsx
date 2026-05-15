@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/src/shared/constants/colors';
+import { radii, softShadow } from '@/src/shared/constants/visualSystem';
 
 type SelectableCardProps = {
   title: string;
@@ -36,19 +37,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
     justifyContent: 'space-between',
-    minHeight: 78,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 18,
-    elevation: 1,
+    minHeight: 84,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    ...softShadow,
   },
   content: {
     flex: 1,
@@ -57,7 +54,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   subtitle: {
     color: colors.mutedText,

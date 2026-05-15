@@ -6,5 +6,6 @@ export type KanaExample = {
   meaningEs: string;
   meaningEn: string;
   imageKey?: string;
+  mascotKey?: string;
   source: 'official' | 'user';
 };

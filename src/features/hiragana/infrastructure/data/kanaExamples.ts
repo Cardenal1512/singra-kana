@@ -8,6 +8,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'akachan',
     meaningEs: 'bebé',
     meaningEn: 'baby',
+    imageKey: 'akachan',
     source: 'official',
   },
   {
@@ -17,6 +18,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'ichigo',
     meaningEs: 'fresa',
     meaningEn: 'strawberry',
+    imageKey: 'ichigo',
     source: 'official',
   },
   {
@@ -26,6 +28,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'udon',
     meaningEs: 'udon',
     meaningEn: 'udon noodles',
+    imageKey: 'udon',
     source: 'official',
   },
   {
@@ -35,6 +38,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'eiga',
     meaningEs: 'película',
     meaningEn: 'movie',
+    imageKey: 'eiga',
     source: 'official',
   },
   {
@@ -44,6 +48,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'onpu',
     meaningEs: 'nota musical',
     meaningEn: 'musical note',
+    imageKey: 'onpu',
     source: 'official',
   },
   {
@@ -53,6 +58,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'kaeru',
     meaningEs: 'rana',
     meaningEn: 'frog',
+    imageKey: 'kaeru',
     source: 'official',
   },
   {
@@ -62,6 +68,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'kitsune',
     meaningEs: 'zorro',
     meaningEn: 'fox',
+    imageKey: 'kitsune',
     source: 'official',
   },
   {
@@ -71,6 +78,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'kuruma',
     meaningEs: 'coche',
     meaningEn: 'car',
+    imageKey: 'kuruma',
     source: 'official',
   },
   {
@@ -80,6 +88,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'keisanki',
     meaningEs: 'calculadora',
     meaningEn: 'calculator',
+    imageKey: 'keisanki',
     source: 'official',
   },
   {
@@ -89,6 +98,7 @@ export const kanaExamples: KanaExample[] = [
     romaji: 'kodomo',
     meaningEs: 'niño',
     meaningEn: 'child',
+    imageKey: 'kodomo',
     source: 'official',
   },
 ];

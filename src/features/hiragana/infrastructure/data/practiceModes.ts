@@ -1,0 +1,55 @@
+import type { PracticeModeConfig } from '@/src/features/hiragana/domain/models/PracticeModeConfig';
+
+export const practiceModes: PracticeModeConfig[] = [
+  {
+    id: 'trace',
+    mode: 'trace',
+    titleKey: 'trace',
+    descriptionKey: 'trace',
+    japaneseLabel: 'なぞり書き',
+    imageKey: 'trace',
+    enabled: true,
+  },
+  {
+    id: 'memory',
+    mode: 'memory',
+    titleKey: 'memory',
+    descriptionKey: 'memory',
+    japaneseLabel: '暗記書き',
+    imageKey: 'memory',
+    enabled: true,
+  },
+  {
+    id: 'romaji',
+    mode: 'romajiQuiz',
+    titleKey: 'romaji',
+    descriptionKey: 'romaji',
+    japaneseLabel: 'ローマ字クイズ',
+    imageKey: 'romaji',
+    enabled: true,
+  },
+  {
+    id: 'words',
+    titleKey: 'words',
+    descriptionKey: 'words',
+    japaneseLabel: 'ことば',
+    imageKey: 'words',
+    enabled: false,
+  },
+  {
+    id: 'speed',
+    titleKey: 'speed',
+    descriptionKey: 'speed',
+    japaneseLabel: 'スピード',
+    imageKey: 'speed',
+    enabled: false,
+  },
+  {
+    id: 'listening',
+    titleKey: 'listening',
+    descriptionKey: 'listening',
+    japaneseLabel: 'ききとり',
+    imageKey: 'listening',
+    enabled: false,
+  },
+];

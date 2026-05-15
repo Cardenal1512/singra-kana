@@ -1,4 +1,11 @@
-import { Image, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ImageSourcePropType,
+} from 'react-native';
 
 import type { KanaExample } from '@/src/features/hiragana/domain/models/KanaExample';
 import { colors } from '@/src/shared/constants/colors';
@@ -23,8 +30,10 @@ export function KanaPracticeHeader({
   exampleImage,
 }: KanaPracticeHeaderProps) {
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
   const meaning = example && language === 'es' ? example.meaningEs : example?.meaningEn;
   const hasVisual = Boolean(mascotImage || exampleImage);
+  const exampleImageSize = getExampleImageSize(width);
 
   return (
     <View style={styles.container}>
@@ -47,9 +56,7 @@ export function KanaPracticeHeader({
             <View style={styles.exampleBlock}>
               <Text style={styles.exampleIntro}>{t.writing.exampleIntro}</Text>
               <Text style={styles.exampleWord}>{example.word}</Text>
-              <Text style={styles.exampleMeta}>
-                {example.romaji} · {meaning}
-              </Text>
+              <Text style={styles.exampleMeta}>{`${example.romaji} · ${meaning}`}</Text>
             </View>
           ) : null}
         </View>
@@ -57,12 +64,32 @@ export function KanaPracticeHeader({
         {hasVisual ? (
           <View style={styles.visualColumn}>
             {mascotImage ? <Image source={mascotImage} style={styles.mascotImage} /> : null}
-            {exampleImage ? <Image source={exampleImage} style={styles.exampleImage} /> : null}
+            {exampleImage ? (
+              <View
+                style={[
+                  styles.exampleImageContainer,
+                  { height: exampleImageSize, width: exampleImageSize },
+                ]}>
+                <Image
+                  source={exampleImage}
+                  style={styles.exampleImage}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
     </View>
   );
+}
+
+function getExampleImageSize(width: number) {
+  if (width >= 768) {
+    return 130;
+  }
+
+  return 90;
 }
 
 function formatTranslation(template: string, values: Record<string, string>) {
@@ -90,6 +117,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     justifyContent: 'space-between',
     paddingHorizontal: 16,
@@ -138,6 +166,7 @@ const styles = StyleSheet.create({
   },
   visualColumn: {
     alignItems: 'center',
+    flexShrink: 0,
     gap: 8,
     justifyContent: 'center',
   },
@@ -146,10 +175,13 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
     width: 54,
   },
+  exampleImageContainer: {
+    alignItems: 'center',
+    flexShrink: 0,
+    justifyContent: 'center',
+  },
   exampleImage: {
-    borderRadius: 12,
-    height: 76,
-    resizeMode: 'cover',
-    width: 76,
+    height: '100%',
+    width: '100%',
   },
 });

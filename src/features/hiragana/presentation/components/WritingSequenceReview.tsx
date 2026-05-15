@@ -40,8 +40,10 @@ export function WritingSequenceReview({
         <Text style={styles.title}>{title}</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>{yourWritingLabel}</Text>
+      <View style={[styles.section, styles.userSection]}>
+        <View style={styles.sectionLabelPill}>
+          <Text style={styles.sectionLabel}>{yourWritingLabel}</Text>
+        </View>
         <View style={[styles.sequence, { gap: itemGap, width: sequenceWidth }]}>
           {results.map((result, index) => (
             <View
@@ -58,8 +60,10 @@ export function WritingSequenceReview({
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>{correctLabel}</Text>
+      <View style={[styles.section, styles.correctSection]}>
+        <View style={styles.sectionLabelPill}>
+          <Text style={styles.sectionLabel}>{correctLabel}</Text>
+        </View>
         <View style={[styles.sequence, { gap: itemGap, width: sequenceWidth }]}>
           {results.map((result, index) => (
             <Text
@@ -102,7 +106,7 @@ function getItemSize(availableWidth: number, columnCount: number) {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 24,
+    gap: 18,
   },
   header: {
     alignItems: 'center',
@@ -114,11 +118,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   section: {
-    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  userSection: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  correctSection: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.borderStrong,
+  },
+  sectionLabelPill: {
+    alignSelf: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   sectionLabel: {
     color: colors.mutedText,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -137,10 +161,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     padding: previewInset,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 1,
   },
   correctKana: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: 14,
+    borderWidth: 1,
     color: colors.text,
     fontWeight: '700',
+    overflow: 'hidden',
     textAlign: 'center',
     textAlignVertical: 'center',
   },
