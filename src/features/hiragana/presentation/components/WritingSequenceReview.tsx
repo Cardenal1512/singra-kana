@@ -7,6 +7,7 @@ import { colors } from '@/src/shared/constants/colors';
 
 type WritingSequenceReviewProps = {
   availableWidth: number;
+  compact?: boolean;
   correctLabel: string;
   results: WritingPracticeResult[];
   sourceCanvasSize: CanvasSize;
@@ -15,13 +16,18 @@ type WritingSequenceReviewProps = {
 };
 
 const itemGap = 6;
+const compactItemGap = 4;
 const maxItemsPerRow = 5;
 const maxPreviewSize = 82;
+const compactMaxPreviewSize = 50;
 const minPreviewSize = 50;
+const compactMinPreviewSize = 38;
 const previewInset = 4;
+const compactPreviewInset = 3;
 
 export function WritingSequenceReview({
   availableWidth,
+  compact = false,
   correctLabel,
   results,
   sourceCanvasSize,
@@ -29,26 +35,34 @@ export function WritingSequenceReview({
   yourWritingLabel,
 }: WritingSequenceReviewProps) {
   const columnCount = getColumnCount(availableWidth, results.length);
-  const itemSize = getItemSize(availableWidth, columnCount);
-  const previewSize = Math.max(1, itemSize - previewInset * 2);
-  const sequenceWidth = itemSize * columnCount + itemGap * (columnCount - 1);
-  const correctFontSize = Math.min(42, itemSize * 0.62);
+  const gap = compact ? compactItemGap : itemGap;
+  const inset = compact ? compactPreviewInset : previewInset;
+  const itemSize = getItemSize(availableWidth, columnCount, gap, compact);
+  const previewSize = Math.max(1, itemSize - inset * 2);
+  const sequenceWidth = itemSize * columnCount + gap * (columnCount - 1);
+  const correctFontSize = Math.min(compact ? 30 : 42, itemSize * 0.62);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact ? styles.compactContainer : null]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, compact ? styles.compactTitle : null]}>{title}</Text>
       </View>
 
-      <View style={[styles.section, styles.userSection]}>
-        <View style={styles.sectionLabelPill}>
-          <Text style={styles.sectionLabel}>{yourWritingLabel}</Text>
+      <View style={[styles.section, compact ? styles.compactSection : null, styles.userSection]}>
+        <View style={[styles.sectionLabelPill, compact ? styles.compactSectionLabelPill : null]}>
+          <Text style={[styles.sectionLabel, compact ? styles.compactSectionLabel : null]}>
+            {yourWritingLabel}
+          </Text>
         </View>
-        <View style={[styles.sequence, { gap: itemGap, width: sequenceWidth }]}>
+        <View style={[styles.sequence, { gap, width: sequenceWidth }]}>
           {results.map((result, index) => (
             <View
               key={`user-${result.kana}-${index}`}
-              style={[styles.previewItem, { height: itemSize, width: itemSize }]}>
+              style={[
+                styles.previewItem,
+                compact ? styles.compactPreviewItem : null,
+                { height: itemSize, width: itemSize },
+              ]}>
               <StrokePreview
                 size={previewSize}
                 sourceCanvasSize={sourceCanvasSize}
@@ -60,16 +74,19 @@ export function WritingSequenceReview({
         </View>
       </View>
 
-      <View style={[styles.section, styles.correctSection]}>
-        <View style={styles.sectionLabelPill}>
-          <Text style={styles.sectionLabel}>{correctLabel}</Text>
+      <View style={[styles.section, compact ? styles.compactSection : null, styles.correctSection]}>
+        <View style={[styles.sectionLabelPill, compact ? styles.compactSectionLabelPill : null]}>
+          <Text style={[styles.sectionLabel, compact ? styles.compactSectionLabel : null]}>
+            {correctLabel}
+          </Text>
         </View>
-        <View style={[styles.sequence, { gap: itemGap, width: sequenceWidth }]}>
+        <View style={[styles.sequence, { gap, width: sequenceWidth }]}>
           {results.map((result, index) => (
             <Text
               key={`correct-${result.kana}-${index}`}
               style={[
                 styles.correctKana,
+                compact ? styles.compactCorrectKana : null,
                 {
                   fontSize: correctFontSize,
                   height: itemSize,
@@ -89,24 +106,37 @@ export function WritingSequenceReview({
 function getColumnCount(availableWidth: number, itemCount: number) {
   const preferredColumns = Math.min(maxItemsPerRow, itemCount);
   const minWidthForPreferred =
-    preferredColumns * minPreviewSize + itemGap * (preferredColumns - 1);
+    preferredColumns * compactMinPreviewSize + compactItemGap * (preferredColumns - 1);
 
   if (availableWidth >= minWidthForPreferred) {
     return preferredColumns;
   }
 
-  const columnsThatFit = Math.floor((availableWidth + itemGap) / (minPreviewSize + itemGap));
+  const columnsThatFit = Math.floor(
+    (availableWidth + compactItemGap) / (compactMinPreviewSize + compactItemGap),
+  );
   return Math.max(1, Math.min(preferredColumns, columnsThatFit));
 }
 
-function getItemSize(availableWidth: number, columnCount: number) {
-  const size = (availableWidth - itemGap * (columnCount - 1)) / columnCount;
-  return Math.max(minPreviewSize, Math.min(maxPreviewSize, size));
+function getItemSize(
+  availableWidth: number,
+  columnCount: number,
+  gap: number,
+  compact: boolean,
+) {
+  const size = (availableWidth - gap * (columnCount - 1)) / columnCount;
+  return Math.max(
+    compact ? compactMinPreviewSize : minPreviewSize,
+    Math.min(compact ? compactMaxPreviewSize : maxPreviewSize, size),
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     gap: 18,
+  },
+  compactContainer: {
+    gap: 8,
   },
   header: {
     alignItems: 'center',
@@ -117,11 +147,20 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
+  compactTitle: {
+    fontSize: 21,
+  },
   section: {
     borderRadius: 18,
     borderWidth: 1,
     gap: 12,
     padding: 14,
+  },
+  compactSection: {
+    borderRadius: 14,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
   },
   userSection: {
     backgroundColor: colors.surface,
@@ -140,12 +179,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
+  compactSectionLabelPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
   sectionLabel: {
     color: colors.mutedText,
     fontSize: 12,
     fontWeight: '900',
     textAlign: 'center',
     textTransform: 'uppercase',
+  },
+  compactSectionLabel: {
+    fontSize: 10,
   },
   sequence: {
     alignSelf: 'center',
@@ -167,6 +213,10 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 1,
   },
+  compactPreviewItem: {
+    borderRadius: 10,
+    padding: compactPreviewInset,
+  },
   correctKana: {
     backgroundColor: colors.surface,
     borderColor: colors.borderStrong,
@@ -177,5 +227,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     textAlign: 'center',
     textAlignVertical: 'center',
+  },
+  compactCorrectKana: {
+    borderRadius: 10,
   },
 });

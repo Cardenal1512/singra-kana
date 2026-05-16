@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import { ScreenHeader } from '@/src/features/hiragana/presentation/components/ScreenHeader';
 import { AppButton } from '@/src/shared/components/AppButton';
+import { CompletionModal } from '@/src/shared/components/CompletionModal';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -11,14 +12,32 @@ import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSy
 type FlashcardScreenProps = {
   series: KanaSeries;
   onBack: () => void;
+  onNextSeries: () => void;
+  onRepeatSeries: () => void;
 };
 
-export function FlashcardScreen({ series, onBack }: FlashcardScreenProps) {
+export function FlashcardScreen({
+  series,
+  onBack,
+  onNextSeries,
+  onRepeatSeries,
+}: FlashcardScreenProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [completed, setCompleted] = useState(false);
   const currentCard = series.characters[currentIndex];
 
   function goToNextCard() {
-    setCurrentIndex((index) => (index + 1) % series.characters.length);
+    if (currentIndex >= series.characters.length - 1) {
+      setCompleted(true);
+      return;
+    }
+
+    setCurrentIndex((index) => index + 1);
+  }
+
+  function repeatFlashcards() {
+    setCurrentIndex(0);
+    setCompleted(false);
   }
 
   return (
@@ -27,17 +46,27 @@ export function FlashcardScreen({ series, onBack }: FlashcardScreenProps) {
       <View style={styles.content}>
         <ScreenHeader title={series.title} subtitle="Flashcards" onBack={onBack} />
 
-        <View style={styles.flashcard}>
-          <View style={styles.kanaHalo}>
-            <Text style={styles.kana}>{currentCard.kana}</Text>
-          </View>
-          <Text style={styles.romaji}>{currentCard.romaji}</Text>
-          <Text style={styles.counter}>
-            {currentIndex + 1} / {series.characters.length}
-          </Text>
-        </View>
+        {completed ? (
+          <CompletionModal
+            onChangeMode={onBack}
+            onNext={onNextSeries}
+            onRepeat={series.id === 'random' ? onRepeatSeries : repeatFlashcards}
+          />
+        ) : (
+          <>
+            <View style={styles.flashcard}>
+              <View style={styles.kanaHalo}>
+                <Text style={styles.kana}>{currentCard.kana}</Text>
+              </View>
+              <Text style={styles.romaji}>{currentCard.romaji}</Text>
+              <Text style={styles.counter}>
+                {currentIndex + 1} / {series.characters.length}
+              </Text>
+            </View>
 
-        <AppButton label="Next" onPress={goToNextCard} />
+            <AppButton label="Next" onPress={goToNextCard} />
+          </>
+        )}
       </View>
     </View>
   );

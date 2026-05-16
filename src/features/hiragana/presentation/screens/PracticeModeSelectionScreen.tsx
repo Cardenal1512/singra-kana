@@ -71,7 +71,7 @@ export function PracticeModeSelectionScreen({
         </View>
 
         <View style={[styles.grid, { gap: gridGap }]}>
-          {practiceModes.map((config) => {
+          {practiceModes.map((config, index) => {
             const copy = t.practiceModes[config.titleKey];
 
             return (
@@ -81,6 +81,7 @@ export function PracticeModeSelectionScreen({
                 description={copy.description}
                 japaneseLabel={config.japaneseLabel}
                 imageSource={getModeImage(config.imageKey)}
+                index={index}
                 accentColor={modeAccentColors[config.id]}
                 disabled={!config.enabled}
                 comingSoonLabel={t.common.comingSoon}

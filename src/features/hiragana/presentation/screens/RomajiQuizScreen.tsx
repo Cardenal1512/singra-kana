@@ -14,6 +14,7 @@ import { checkRomajiAnswer } from '@/src/features/hiragana/application/useCases/
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import { hiraganaSeries } from '@/src/features/hiragana/infrastructure/data/hiraganaSeries';
 import { AppButton } from '@/src/shared/components/AppButton';
+import { CompletionModal } from '@/src/shared/components/CompletionModal';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -23,12 +24,16 @@ type RomajiQuizScreenProps = {
   series?: KanaSeries;
   seriesId: string;
   onBack: () => void;
+  onNextSeries: () => void;
+  onRepeatSeries: () => void;
 };
 
 export function RomajiQuizScreen({
   series: providedSeries,
   seriesId,
   onBack,
+  onNextSeries,
+  onRepeatSeries,
 }: RomajiQuizScreenProps) {
   const { t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
@@ -119,7 +124,11 @@ export function RomajiQuizScreen({
             </View>
           </View>
 
-          <AppButton label={t.common.restart} onPress={restartQuiz} />
+          <CompletionModal
+            onChangeMode={onBack}
+            onNext={onNextSeries}
+            onRepeat={selectedSeries.id === 'random' ? onRepeatSeries : restartQuiz}
+          />
         </View>
       </View>
     );

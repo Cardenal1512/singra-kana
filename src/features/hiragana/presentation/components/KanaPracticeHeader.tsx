@@ -19,6 +19,7 @@ type KanaPracticeHeaderProps = {
   language: Language;
   mascotImage?: ImageSourcePropType;
   exampleImage?: ImageSourcePropType;
+  showKanaInfo?: boolean;
 };
 
 export function KanaPracticeHeader({
@@ -28,6 +29,7 @@ export function KanaPracticeHeader({
   language,
   mascotImage,
   exampleImage,
+  showKanaInfo = true,
 }: KanaPracticeHeaderProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
@@ -39,6 +41,7 @@ export function KanaPracticeHeader({
     <View style={styles.container}>
       <Text style={styles.title}>{t.writing.title}</Text>
 
+      {showKanaInfo ? (
       <View style={styles.infoCard}>
         <View style={styles.copy}>
           <View style={styles.kanaBlock}>
@@ -80,6 +83,12 @@ export function KanaPracticeHeader({
           </View>
         ) : null}
       </View>
+      ) : (
+        <View style={styles.memoryPromptCard}>
+          <Text style={styles.memoryPromptLabel}>{t.writing.memoryInstruction}</Text>
+          <Text style={styles.memoryPromptRomaji}>{romaji.toUpperCase()}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -122,6 +131,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  memoryPromptCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    minWidth: 150,
+  },
+  memoryPromptLabel: {
+    color: colors.mutedText,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  memoryPromptRomaji: {
+    color: colors.primary,
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 40,
+    textAlign: 'center',
   },
   copy: {
     flex: 1,

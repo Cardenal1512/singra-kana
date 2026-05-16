@@ -2,19 +2,34 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors } from '@/src/shared/constants/visualSystem';
+import { getAmbientFloatStyle } from '@/src/shared/motion/motionStyles';
+import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 
 type KawaiiBackgroundProps = {
   kana?: string[];
 };
 
 export function KawaiiBackground({ kana = ['あ', 'か', 'ま'] }: KawaiiBackgroundProps) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const bubbleTopMotion = getAmbientFloatStyle(prefersReducedMotion, 12000);
+  const bubbleBottomMotion = getAmbientFloatStyle(prefersReducedMotion, 15000);
+  const kanaLeftMotion = getAmbientFloatStyle(prefersReducedMotion, 13000);
+  const kanaRightMotion = getAmbientFloatStyle(prefersReducedMotion, 16000);
+  const kanaBottomMotion = getAmbientFloatStyle(prefersReducedMotion, 14000);
+
   return (
     <View pointerEvents="none" style={styles.container}>
-      <View style={[styles.bubble, styles.bubbleTop]} />
-      <View style={[styles.bubble, styles.bubbleBottom]} />
-      <Text style={[styles.kana, styles.kanaLeft]}>{kana[0]}</Text>
-      <Text style={[styles.kana, styles.kanaRight]}>{kana[1]}</Text>
-      <Text style={[styles.kana, styles.kanaBottom]}>{kana[2]}</Text>
+      <View style={[styles.bubble, styles.bubbleTop, bubbleTopMotion]} />
+      <View style={[styles.bubble, styles.bubbleBottom, bubbleBottomMotion]} />
+      <Text style={[styles.kana, styles.kanaLeft, kanaLeftMotion as object]}>
+        {kana[0]}
+      </Text>
+      <Text style={[styles.kana, styles.kanaRight, kanaRightMotion as object]}>
+        {kana[1]}
+      </Text>
+      <Text style={[styles.kana, styles.kanaBottom, kanaBottomMotion as object]}>
+        {kana[2]}
+      </Text>
     </View>
   );
 }
@@ -23,6 +38,7 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+    zIndex: 0,
   },
   bubble: {
     borderRadius: 999,

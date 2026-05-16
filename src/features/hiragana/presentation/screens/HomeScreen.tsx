@@ -5,6 +5,7 @@ import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { SelectableCard } from '@/src/shared/components/SelectableCard';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
+import { FloatingView } from '@/src/shared/motion/FloatingView';
 
 type HomeScreenProps = {
   onOpenHiragana: () => void;
@@ -14,55 +15,68 @@ export function HomeScreen({ onOpenHiragana }: HomeScreenProps) {
   const { width } = useWindowDimensions();
   const singraHomeImage = getMascotImage('singraHome');
   const isWide = width >= 720;
-  const mascotSize = isWide ? 260 : Math.min(190, Math.max(150, width * 0.42));
+  const mascotSize = isWide ? 260 : Math.min(160, Math.max(130, width * 0.38));
+  const contentWidth = Math.min(Math.max(width - 48, 0), 760);
+  const cardListWidth = Math.min(contentWidth, 560);
+  const titleSize = isWide ? 44 : Math.min(38, Math.max(32, width * 0.09));
 
   return (
     <View style={styles.root}>
       <KawaiiBackground kana={['仮', 'あ', '字']} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.hero, isWide ? styles.heroWide : styles.heroStacked]}>
-          <View style={styles.header}>
-            {!singraHomeImage && (
-              <View style={styles.heroMark}>
-                <View style={styles.heroHalo}>
-                  <Text style={styles.heroKana}>仮</Text>
-                </View>
+        <View style={[styles.motionFrame, { width: contentWidth }]}>
+          <View
+            style={[
+              styles.hero,
+              isWide ? styles.heroWide : styles.heroStacked,
+              { width: contentWidth },
+            ]}>
+              <View style={styles.header}>
+                {!singraHomeImage && (
+                  <View style={styles.heroMark}>
+                    <View style={styles.heroHalo}>
+                      <Text style={styles.heroKana}>仮</Text>
+                    </View>
+                  </View>
+                )}
+                <Text style={[styles.title, { fontSize: titleSize }]}>Singra Kana</Text>
+                <Text style={styles.subtitle}>Learn Japanese step by step</Text>
               </View>
-            )}
-            <Text style={styles.title}>Singra Kana</Text>
-            <Text style={styles.subtitle}>Learn Japanese step by step</Text>
+
+            {singraHomeImage ? (
+                <FloatingView>
+                  <View
+                    style={[
+                      styles.mascotShell,
+                      { height: mascotSize + 34, width: mascotSize + 34 },
+                    ]}>
+                    <View
+                      style={[
+                        styles.mascotHalo,
+                        { height: mascotSize + 18, width: mascotSize + 18 },
+                      ]}>
+                      <Image
+                        accessibilityLabel="Singra, mascota de la app"
+                        resizeMode="contain"
+                        source={singraHomeImage}
+                        style={{ height: mascotSize, width: mascotSize }}
+                      />
+                    </View>
+                  </View>
+                </FloatingView>
+            ) : null}
           </View>
 
-          {singraHomeImage ? (
-            <View
-              style={[
-                styles.mascotShell,
-                { height: mascotSize + 34, width: mascotSize + 34 },
-              ]}>
-              <View
-                style={[
-                  styles.mascotHalo,
-                  { height: mascotSize + 18, width: mascotSize + 18 },
-                ]}>
-                <Image
-                  accessibilityLabel="Singra, mascota de la app"
-                  resizeMode="contain"
-                  source={singraHomeImage}
-                  style={{ height: mascotSize, width: mascotSize }}
-                />
-              </View>
+            <View style={[styles.cardList, { width: cardListWidth }]}>
+              <SelectableCard
+                index={0}
+                title="Hiragana"
+                subtitle="Start with the basic kana syllabary"
+                onPress={onOpenHiragana}
+              />
+              <SelectableCard title="Katakana" subtitle="Coming later" disabled index={1} />
+              <SelectableCard title="Kanji" subtitle="Coming later" disabled index={2} />
             </View>
-          ) : null}
-        </View>
-
-        <View style={styles.cardList}>
-          <SelectableCard
-            title="Hiragana"
-            subtitle="Start with the basic kana syllabary"
-            onPress={onOpenHiragana}
-          />
-          <SelectableCard title="Katakana" subtitle="Coming later" disabled />
-          <SelectableCard title="Kanji" subtitle="Coming later" disabled />
         </View>
       </ScrollView>
     </View>
@@ -72,18 +86,25 @@ export function HomeScreen({ onOpenHiragana }: HomeScreenProps) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    minHeight: '100%',
+    overflow: 'visible',
   },
   content: {
     alignItems: 'center',
     flexGrow: 1,
-    gap: 28,
     justifyContent: 'center',
     padding: 24,
+    position: 'relative',
+    zIndex: 1,
+  },
+  motionFrame: {
+    alignItems: 'center',
+    gap: 28,
+    maxWidth: 760,
   },
   hero: {
     alignItems: 'center',
     maxWidth: 760,
-    width: '100%',
   },
   heroWide: {
     flexDirection: 'row',
@@ -91,7 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroStacked: {
-    flexDirection: 'column-reverse',
+    flexDirection: 'column',
     gap: 12,
   },
   header: {
@@ -138,7 +159,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 44,
     fontWeight: '900',
     letterSpacing: 0,
     textAlign: 'center',
@@ -154,6 +174,5 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: 12,
     maxWidth: 560,
-    width: '100%',
   },
 });

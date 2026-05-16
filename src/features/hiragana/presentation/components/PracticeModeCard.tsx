@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Image,
   Pressable,
@@ -8,6 +9,8 @@ import {
 } from 'react-native';
 
 import { colors } from '@/src/shared/constants/colors';
+import { getCardEnterStyle, softTransition } from '@/src/shared/motion/motionStyles';
+import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 
 type PracticeModeCardProps = {
   title: string;
@@ -18,6 +21,7 @@ type PracticeModeCardProps = {
   disabled?: boolean;
   comingSoonLabel: string;
   onPress?: () => void;
+  index?: number;
   width: number;
 };
 
@@ -30,18 +34,26 @@ export function PracticeModeCard({
   disabled = false,
   comingSoonLabel,
   onPress,
+  index = 0,
   width,
 }: PracticeModeCardProps) {
+  const [hovered, setHovered] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
         { borderColor: accentColor, width },
+        getCardEnterStyle(index, prefersReducedMotion),
         disabled ? styles.disabledCard : null,
-        pressed && !disabled ? styles.pressed : null,
+        hovered && !disabled && !prefersReducedMotion ? styles.hovered : null,
+        pressed && !disabled && !prefersReducedMotion ? styles.pressed : null,
       ]}>
       <View style={[styles.imageFrame, { backgroundColor: accentColor }]}>
         <View style={styles.halo} />
@@ -89,6 +101,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 18,
     elevation: 1,
+    ...softTransition,
   },
   imageFrame: {
     alignItems: 'center',
@@ -178,6 +191,11 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.86,
-    transform: [{ translateY: 1 }],
+    transform: [{ scale: 0.98 }],
+  },
+  hovered: {
+    shadowOpacity: 0.16,
+    shadowRadius: 26,
+    transform: [{ translateY: -6 }, { scale: 1.018 }],
   },
 });

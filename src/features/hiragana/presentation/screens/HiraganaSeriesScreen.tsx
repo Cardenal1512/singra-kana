@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
+import { getCardEnterStyle, softTransition } from '@/src/shared/motion/motionStyles';
+import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 
 type HiraganaSeriesScreenProps = {
   series: KanaSeries[];
@@ -46,13 +49,15 @@ export function HiraganaSeriesScreen({
           title="MODO RANDOM"
           subtitle="10 random kana"
           representativeKana="乱"
+          index={0}
           onPress={onSelectRandom}
         />
 
         <View style={styles.grid}>
-          {series.map((item) => (
+          {series.map((item, index) => (
             <SeriesTile
               key={item.id}
+              index={index + 1}
               series={item}
               size={cellSize}
               onPress={() => onSelectSeries(item.id)}
@@ -60,22 +65,34 @@ export function HiraganaSeriesScreen({
           ))}
         </View>
 
-        <WideTile title="WORDS" subtitle="Coming soon" representativeKana="言" disabled />
+        <WideTile
+          title="WORDS"
+          subtitle="Coming soon"
+          representativeKana="言"
+          disabled
+          index={series.length + 1}
+        />
       </View>
     </ScrollView>
   );
 }
 
 type SeriesTileProps = {
+  index: number;
   series: KanaSeries;
   size: number;
   onPress: () => void;
 };
 
-function SeriesTile({ series, size, onPress }: SeriesTileProps) {
+function SeriesTile({ index, series, size, onPress }: SeriesTileProps) {
+  const [hovered, setHovered] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   return (
     <Pressable
       accessibilityRole="button"
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
@@ -83,7 +100,9 @@ function SeriesTile({ series, size, onPress }: SeriesTileProps) {
           height: size,
           width: size,
         },
-        pressed ? styles.pressed : null,
+        getCardEnterStyle(index, prefersReducedMotion),
+        hovered && !prefersReducedMotion ? styles.hovered : null,
+        pressed && !prefersReducedMotion ? styles.pressed : null,
       ]}>
       <Text style={styles.kana}>{series.representativeKana}</Text>
       <View style={styles.tileText}>
@@ -104,6 +123,7 @@ type WideTileProps = {
   title: string;
   subtitle: string;
   representativeKana: string;
+  index: number;
   disabled?: boolean;
   onPress?: () => void;
 };
@@ -112,18 +132,26 @@ function WideTile({
   title,
   subtitle,
   representativeKana,
+  index,
   disabled = false,
   onPress,
 }: WideTileProps) {
+  const [hovered, setHovered] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
       onPress={onPress}
       style={({ pressed }) => [
         styles.wideTile,
+        getCardEnterStyle(index, prefersReducedMotion),
         disabled ? styles.disabledTile : null,
-        pressed ? styles.pressed : null,
+        hovered && !disabled && !prefersReducedMotion ? styles.hovered : null,
+        pressed && !disabled && !prefersReducedMotion ? styles.pressed : null,
       ]}>
       <Text style={[styles.wideKana, disabled ? styles.disabledText : null]}>
         {representativeKana}
@@ -205,6 +233,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 16,
     elevation: 1,
+    ...softTransition,
   },
   kana: {
     color: colors.ink,
@@ -245,6 +274,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 16,
     elevation: 1,
+    ...softTransition,
   },
   wideKana: {
     color: colors.primary,
@@ -276,6 +306,11 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.86,
-    transform: [{ translateY: 1 }],
+    transform: [{ scale: 0.98 }],
+  },
+  hovered: {
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    transform: [{ translateY: -6 }, { scale: 1.015 }],
   },
 });
