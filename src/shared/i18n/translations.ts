@@ -1,9 +1,20 @@
 export type Language = 'en' | 'es';
 
-export const currentLanguage: Language = 'es';
-
 export const translations = {
   en: {
+    language: {
+      english: 'English',
+      label: 'Language',
+      spanish: 'Spanish',
+    },
+    home: {
+      title: 'Singra Kana',
+      subtitle: 'Learn Japanese step by step',
+      hiraganaSubtitle: 'Start with the basic kana syllabary',
+      katakanaSubtitle: 'Coming later',
+      kanjiSubtitle: 'Coming later',
+      mascotLabel: 'Singra, the app mascot',
+    },
     common: {
       back: 'Back',
       check: 'Check',
@@ -71,6 +82,19 @@ export const translations = {
     },
   },
   es: {
+    language: {
+      english: 'Inglés',
+      label: 'Idioma',
+      spanish: 'Español',
+    },
+    home: {
+      title: 'Singra Kana',
+      subtitle: 'Aprende japonés paso a paso',
+      hiraganaSubtitle: 'Empieza con el silabario kana básico',
+      katakanaSubtitle: 'Más adelante',
+      kanjiSubtitle: 'Más adelante',
+      mascotLabel: 'Singra, mascota de la app',
+    },
     common: {
       back: 'Volver',
       check: 'Comprobar',

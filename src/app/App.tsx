@@ -13,6 +13,7 @@ import { KanaWritingPracticeScreen } from '@/src/features/hiragana/presentation/
 import { PracticeModeSelectionScreen } from '@/src/features/hiragana/presentation/screens/PracticeModeSelectionScreen';
 import { RomajiQuizScreen } from '@/src/features/hiragana/presentation/screens/RomajiQuizScreen';
 import { colors } from '@/src/shared/constants/colors';
+import { LanguageProvider } from '@/src/shared/i18n/useTranslation';
 import { AnimatedRouteContainer } from '@/src/shared/motion/AnimatedRouteContainer';
 import { MotionStyleSheet } from '@/src/shared/motion/MotionStyleSheet';
 
@@ -36,107 +37,109 @@ export default function SingraKanaApp() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <MotionStyleSheet />
-      <AnimatedRouteContainer routeKey={getRouteKey(route)}>
-        {route.name === 'home' ? (
-          <HomeScreen onOpenHiragana={() => setRoute({ name: 'hiraganaSeries' })} />
-        ) : null}
+      <LanguageProvider>
+        <MotionStyleSheet />
+        <AnimatedRouteContainer routeKey={getRouteKey(route)}>
+          {route.name === 'home' ? (
+            <HomeScreen onOpenHiragana={() => setRoute({ name: 'hiraganaSeries' })} />
+          ) : null}
 
-        {route.name === 'hiraganaSeries' ? (
-          <HiraganaSeriesScreen
-            series={hiraganaSeries}
-            onBack={() => setRoute({ name: 'home' })}
-            onSelectRandom={() => {
-              const randomSeries = createRandomKanaSeries(hiraganaSeries);
-              setRoute({ name: 'practiceModes', series: randomSeries });
-            }}
-            onSelectSeries={(seriesId) => {
-              const selectedSeries = hiraganaSeries.find((series) => series.id === seriesId);
+          {route.name === 'hiraganaSeries' ? (
+            <HiraganaSeriesScreen
+              series={hiraganaSeries}
+              onBack={() => setRoute({ name: 'home' })}
+              onSelectRandom={() => {
+                const randomSeries = createRandomKanaSeries(hiraganaSeries);
+                setRoute({ name: 'practiceModes', series: randomSeries });
+              }}
+              onSelectSeries={(seriesId) => {
+                const selectedSeries = hiraganaSeries.find((series) => series.id === seriesId);
 
-              if (selectedSeries) {
-                setRoute({ name: 'practiceModes', series: selectedSeries });
+                if (selectedSeries) {
+                  setRoute({ name: 'practiceModes', series: selectedSeries });
+                }
+              }}
+            />
+          ) : null}
+
+          {route.name === 'practiceModes' ? (
+            <PracticeModeSelectionScreen
+              series={route.series}
+              onBack={() => setRoute({ name: 'hiraganaSeries' })}
+              onSelectMode={(mode) => {
+                if (mode === 'romajiQuiz') {
+                  setRoute({ name: 'romajiQuiz', series: route.series });
+                  return;
+                }
+
+                setRoute({ name: 'writingPractice', mode, series: route.series });
+              }}
+            />
+          ) : null}
+
+          {route.name === 'flashcards' ? (
+            <FlashcardScreen
+              series={route.series}
+              onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
+              onNextSeries={() =>
+                setRoute({
+                  name: 'flashcards',
+                  series: getNextSeries(route.series, hiraganaSeries),
+                })
               }
-            }}
-          />
-        ) : null}
-
-        {route.name === 'practiceModes' ? (
-          <PracticeModeSelectionScreen
-            series={route.series}
-            onBack={() => setRoute({ name: 'hiraganaSeries' })}
-            onSelectMode={(mode) => {
-              if (mode === 'romajiQuiz') {
-                setRoute({ name: 'romajiQuiz', series: route.series });
-                return;
+              onRepeatSeries={() =>
+                setRoute({
+                  name: 'flashcards',
+                  series: getRepeatSeries(route.series, hiraganaSeries),
+                })
               }
+            />
+          ) : null}
 
-              setRoute({ name: 'writingPractice', mode, series: route.series });
-            }}
-          />
-        ) : null}
+          {route.name === 'writingPractice' ? (
+            <KanaWritingPracticeScreen
+              mode={route.mode}
+              series={route.series}
+              seriesId={route.series.id}
+              onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
+              onNextSeries={() =>
+                setRoute({
+                  name: 'writingPractice',
+                  mode: route.mode,
+                  series: getNextSeries(route.series, hiraganaSeries),
+                })
+              }
+              onRepeatSeries={() =>
+                setRoute({
+                  name: 'writingPractice',
+                  mode: route.mode,
+                  series: getRepeatSeries(route.series, hiraganaSeries),
+                })
+              }
+            />
+          ) : null}
 
-        {route.name === 'flashcards' ? (
-          <FlashcardScreen
-            series={route.series}
-            onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
-            onNextSeries={() =>
-              setRoute({
-                name: 'flashcards',
-                series: getNextSeries(route.series, hiraganaSeries),
-              })
-            }
-            onRepeatSeries={() =>
-              setRoute({
-                name: 'flashcards',
-                series: getRepeatSeries(route.series, hiraganaSeries),
-              })
-            }
-          />
-        ) : null}
-
-        {route.name === 'writingPractice' ? (
-          <KanaWritingPracticeScreen
-            mode={route.mode}
-            series={route.series}
-            seriesId={route.series.id}
-            onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
-            onNextSeries={() =>
-              setRoute({
-                name: 'writingPractice',
-                mode: route.mode,
-                series: getNextSeries(route.series, hiraganaSeries),
-              })
-            }
-            onRepeatSeries={() =>
-              setRoute({
-                name: 'writingPractice',
-                mode: route.mode,
-                series: getRepeatSeries(route.series, hiraganaSeries),
-              })
-            }
-          />
-        ) : null}
-
-        {route.name === 'romajiQuiz' ? (
-          <RomajiQuizScreen
-            series={route.series}
-            seriesId={route.series.id}
-            onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
-            onNextSeries={() =>
-              setRoute({
-                name: 'romajiQuiz',
-                series: getNextSeries(route.series, hiraganaSeries),
-              })
-            }
-            onRepeatSeries={() =>
-              setRoute({
-                name: 'romajiQuiz',
-                series: getRepeatSeries(route.series, hiraganaSeries),
-              })
-            }
-          />
-        ) : null}
-      </AnimatedRouteContainer>
+          {route.name === 'romajiQuiz' ? (
+            <RomajiQuizScreen
+              series={route.series}
+              seriesId={route.series.id}
+              onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
+              onNextSeries={() =>
+                setRoute({
+                  name: 'romajiQuiz',
+                  series: getNextSeries(route.series, hiraganaSeries),
+                })
+              }
+              onRepeatSeries={() =>
+                setRoute({
+                  name: 'romajiQuiz',
+                  series: getRepeatSeries(route.series, hiraganaSeries),
+                })
+              }
+            />
+          ) : null}
+        </AnimatedRouteContainer>
+      </LanguageProvider>
     </SafeAreaView>
   );
 }

@@ -11,6 +11,7 @@ type SelectableCardProps = {
   subtitle?: string;
   disabled?: boolean;
   index?: number;
+  width?: number;
   onPress?: () => void;
 };
 
@@ -19,6 +20,7 @@ export function SelectableCard({
   subtitle,
   disabled = false,
   index = 0,
+  width,
   onPress,
 }: SelectableCardProps) {
   const [hovered, setHovered] = useState(false);
@@ -33,6 +35,7 @@ export function SelectableCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
+        width ? { width } : null,
         getCardEnterStyle(index, prefersReducedMotion),
         disabled ? styles.disabledCard : null,
         hovered && !disabled && !prefersReducedMotion ? styles.hovered : null,
