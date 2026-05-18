@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import type { WritingPracticeResult } from '@/src/features/hiragana/domain/models/WritingPracticeResult';
 import type { CanvasSize } from '@/src/features/hiragana/presentation/components/DrawingCanvas';
 import { StrokePreview } from '@/src/features/hiragana/presentation/components/StrokePreview';
+import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { colors } from '@/src/shared/constants/colors';
 
 type WritingSequenceReviewProps = {
@@ -41,6 +42,7 @@ export function WritingSequenceReview({
   const previewSize = Math.max(1, itemSize - inset * 2);
   const sequenceWidth = itemSize * columnCount + gap * (columnCount - 1);
   const correctFontSize = Math.min(compact ? 30 : 42, itemSize * 0.62);
+  const exampleImageSize = compact ? Math.max(34, itemSize * 0.82) : itemSize;
 
   return (
     <View style={[styles.container, compact ? styles.compactContainer : null]}>
@@ -81,22 +83,39 @@ export function WritingSequenceReview({
           </Text>
         </View>
         <View style={[styles.sequence, { gap, width: sequenceWidth }]}>
-          {results.map((result, index) => (
-            <Text
-              key={`correct-${result.kana}-${index}`}
-              style={[
-                styles.correctKana,
-                compact ? styles.compactCorrectKana : null,
-                {
-                  fontSize: correctFontSize,
-                  height: itemSize,
-                  lineHeight: itemSize,
-                  width: itemSize,
-                },
-              ]}>
-              {result.kana}
-            </Text>
-          ))}
+          {results.map((result, index) => {
+            const exampleImage = getVocabularyImage(result.exampleImageKey);
+
+            return (
+              <View
+                key={`correct-${result.kana}-${index}`}
+                style={[styles.correctItem, { width: itemSize }]}>
+                <Text
+                  style={[
+                    styles.correctKana,
+                    compact ? styles.compactCorrectKana : null,
+                    {
+                      fontSize: correctFontSize,
+                      height: itemSize,
+                      lineHeight: itemSize,
+                      width: itemSize,
+                    },
+                  ]}>
+                  {result.kana}
+                </Text>
+                {exampleImage ? (
+                  <View
+                    style={[
+                      styles.exampleImageFrame,
+                      compact ? styles.compactExampleImageFrame : null,
+                      { height: exampleImageSize, width: exampleImageSize },
+                    ]}>
+                    <Image resizeMode="contain" source={exampleImage} style={styles.exampleImage} />
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       </View>
     </View>
@@ -169,6 +188,8 @@ const styles = StyleSheet.create({
   correctSection: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
+    gap: 16,
+    paddingVertical: 18,
   },
   sectionLabelPill: {
     alignSelf: 'center',
@@ -230,5 +251,26 @@ const styles = StyleSheet.create({
   },
   compactCorrectKana: {
     borderRadius: 10,
+  },
+  correctItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  exampleImageFrame: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    padding: 5,
+  },
+  compactExampleImageFrame: {
+    borderRadius: 10,
+    padding: 3,
+  },
+  exampleImage: {
+    height: '100%',
+    width: '100%',
   },
 });

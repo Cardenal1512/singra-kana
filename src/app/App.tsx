@@ -22,10 +22,11 @@ type WritingMode = Extract<PracticeMode, 'trace' | 'memory'>;
 type AppRoute =
   | { name: 'home' }
   | { name: 'hiraganaSeries' }
+  | { name: 'seriesPractice'; seriesId: string }
   | { name: 'practiceModes'; series: KanaSeries }
   | { name: 'flashcards'; series: KanaSeries }
-  | { name: 'writingPractice'; mode: WritingMode; series: KanaSeries }
-  | { name: 'romajiQuiz'; series: KanaSeries };
+  | { name: 'writingPractice'; mode: WritingMode; series: KanaSeries; fromSeriesPractice?: boolean }
+  | { name: 'romajiQuiz'; series: KanaSeries; fromSeriesPractice?: boolean };
 
 export default function SingraKanaApp() {
   const [route, setRoute] = useState<AppRoute>({ name: 'home' });
@@ -52,12 +53,36 @@ export default function SingraKanaApp() {
                 const randomSeries = createRandomKanaSeries(hiraganaSeries);
                 setRoute({ name: 'practiceModes', series: randomSeries });
               }}
-              onSelectSeries={(seriesId) => {
-                const selectedSeries = hiraganaSeries.find((series) => series.id === seriesId);
+              onOpenSeriesPractice={() =>
+                setRoute({ name: 'seriesPractice', seriesId: hiraganaSeries[0]?.id ?? 'vowels' })
+              }
+            />
+          ) : null}
 
-                if (selectedSeries) {
-                  setRoute({ name: 'practiceModes', series: selectedSeries });
+          {route.name === 'seriesPractice' ? (
+            <PracticeModeSelectionScreen
+              series={getSeriesById(route.seriesId, hiraganaSeries)}
+              seriesOptions={hiraganaSeries}
+              onBack={() => setRoute({ name: 'hiraganaSeries' })}
+              onSelectSeries={(seriesId) => setRoute({ name: 'seriesPractice', seriesId })}
+              onSelectMode={(mode) => {
+                const selectedSeries = getSeriesById(route.seriesId, hiraganaSeries);
+
+                if (mode === 'romajiQuiz') {
+                  setRoute({
+                    name: 'romajiQuiz',
+                    series: selectedSeries,
+                    fromSeriesPractice: true,
+                  });
+                  return;
                 }
+
+                setRoute({
+                  name: 'writingPractice',
+                  mode,
+                  series: selectedSeries,
+                  fromSeriesPractice: true,
+                });
               }}
             />
           ) : null}
@@ -101,12 +126,13 @@ export default function SingraKanaApp() {
               mode={route.mode}
               series={route.series}
               seriesId={route.series.id}
-              onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
+              onBack={() => setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice))}
               onNextSeries={() =>
                 setRoute({
                   name: 'writingPractice',
                   mode: route.mode,
                   series: getNextSeries(route.series, hiraganaSeries),
+                  fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
               onRepeatSeries={() =>
@@ -114,6 +140,7 @@ export default function SingraKanaApp() {
                   name: 'writingPractice',
                   mode: route.mode,
                   series: getRepeatSeries(route.series, hiraganaSeries),
+                  fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
             />
@@ -123,17 +150,19 @@ export default function SingraKanaApp() {
             <RomajiQuizScreen
               series={route.series}
               seriesId={route.series.id}
-              onBack={() => setRoute({ name: 'practiceModes', series: route.series })}
+              onBack={() => setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice))}
               onNextSeries={() =>
                 setRoute({
                   name: 'romajiQuiz',
                   series: getNextSeries(route.series, hiraganaSeries),
+                  fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
               onRepeatSeries={() =>
                 setRoute({
                   name: 'romajiQuiz',
                   series: getRepeatSeries(route.series, hiraganaSeries),
+                  fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
             />
@@ -154,6 +183,18 @@ function getRouteKey(route: AppRoute) {
   }
 
   return route.name;
+}
+
+function getSeriesById(seriesId: string, series: KanaSeries[]) {
+  return series.find((item) => item.id === seriesId) ?? series[0];
+}
+
+function getPracticeBackRoute(series: KanaSeries, fromSeriesPractice?: boolean): AppRoute {
+  if (fromSeriesPractice && series.id !== 'random') {
+    return { name: 'seriesPractice', seriesId: series.id };
+  }
+
+  return { name: 'practiceModes', series };
 }
 
 function getSeriesRouteKey(series: KanaSeries) {

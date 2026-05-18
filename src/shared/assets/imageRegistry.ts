@@ -1,6 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
 export const mascotImages = {
+  singraGambate: require('@/assets/mascots/singra/gambate.webp'),
   singraHome: require('@/assets/mascots/singra/singra-home.webp'),
   singraSearch: require('@/assets/mascots/singra/singra-search.webp'),
 } satisfies Record<string, ImageSourcePropType>;

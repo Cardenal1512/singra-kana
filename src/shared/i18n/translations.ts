@@ -69,7 +69,11 @@ export const translations = {
     },
     hiragana: {
       title: 'Hiragana',
-      subtitle: 'Choose a mode or series',
+      subtitle: 'Choose how you want to practice',
+      randomTitle: 'Random mode',
+      randomSubtitle: 'Practice random hiragana kana from all {{count}} available kana',
+      seriesPracticeTitle: 'Practice by series',
+      seriesPracticeSubtitle: 'Choose a series and train its kana',
     },
     quiz: {
       title: 'Romaji quiz',
@@ -149,7 +153,11 @@ export const translations = {
     },
     hiragana: {
       title: 'Hiragana',
-      subtitle: 'Elige un modo o serie',
+      subtitle: 'Elige cómo quieres practicar',
+      randomTitle: 'Modo random',
+      randomSubtitle: 'Practica kanas aleatorios de hiragana entre los {{count}} disponibles',
+      seriesPracticeTitle: 'Práctica por series',
+      seriesPracticeSubtitle: 'Elige una serie y entrena sus kanas',
     },
     quiz: {
       title: 'Quiz de romaji',

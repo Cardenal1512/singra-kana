@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
 import {
   Image,
   Pressable,
@@ -24,7 +25,6 @@ import {
 import { KanaPracticeHeader } from '@/src/features/hiragana/presentation/components/KanaPracticeHeader';
 import { ScreenHeader } from '@/src/features/hiragana/presentation/components/ScreenHeader';
 import { WritingSequenceReview } from '@/src/features/hiragana/presentation/components/WritingSequenceReview';
-import { AppButton } from '@/src/shared/components/AppButton';
 import { AppScreen } from '@/src/shared/components/AppScreen';
 import { CompletionModal } from '@/src/shared/components/CompletionModal';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
@@ -51,7 +51,6 @@ const screenPadding = 18;
 const maxPracticeWidth = 560;
 const maxReviewWidth = 920;
 const reviewLayoutGap = 8;
-const reviewMascotColumnWidth = 220;
 const kanaExampleRepository = new StaticKanaExampleRepository();
 
 export function KanaWritingPracticeScreen({
@@ -71,16 +70,30 @@ export function KanaWritingPracticeScreen({
   const [completed, setCompleted] = useState(false);
   const [helpGuideVisible, setHelpGuideVisible] = useState(false);
   const [results, setResults] = useState<WritingPracticeResult[]>([]);
+  const [practiceCharacters, setPracticeCharacters] = useState<KanaSeries['characters']>(() =>
+    series ? shuffleCharacters(series.characters) : [],
+  );
   const [currentExample, setCurrentExample] = useState<KanaExample | undefined>();
   const practiceWidth = Math.min(width - screenPadding * 2, maxPracticeWidth);
   const reviewWidth = Math.min(width - screenPadding * 2, maxReviewWidth);
-  const isWideReview = reviewWidth >= 760;
   const isCompactReview = width < 720 || height < 780;
-  const reviewMainWidth = isWideReview
-    ? reviewWidth - reviewMascotColumnWidth - reviewLayoutGap
-    : reviewWidth;
+  const reviewMainWidth = reviewWidth;
   const selectedSeries = series;
-  const currentCharacter = selectedSeries?.characters[currentIndex];
+  const currentCharacter = practiceCharacters[currentIndex];
+
+  useEffect(() => {
+    if (!selectedSeries) {
+      setPracticeCharacters([]);
+      return;
+    }
+
+    setPracticeCharacters(shuffleCharacters(selectedSeries.characters));
+    setCurrentIndex(0);
+    setUserStrokes([]);
+    setCompleted(false);
+    setHelpGuideVisible(false);
+    setResults([]);
+  }, [selectedSeries]);
 
   useEffect(() => {
     let isMounted = true;
@@ -116,10 +129,14 @@ export function KanaWritingPracticeScreen({
   const activeSeries = selectedSeries;
   const activeCharacter = currentCharacter;
   const isTraceMode = mode === 'trace';
+  const hasUserStrokes = userStrokes.some((stroke) => stroke.length > 0);
   const shouldShowGuide = isTraceMode || helpGuideVisible;
   const exampleImage = getVocabularyImage(currentExample?.imageKey);
   const mascotImage = getMascotImage(currentExample?.mascotKey);
   const reviewMascotImage = getMascotImage('singraSearch');
+  const nextSeries = getNextSeriesForReview(activeSeries);
+  const nextSeriesLabel = getReviewSeriesLabel(nextSeries, language);
+  const activeSeriesLabel = getReviewSeriesLabel(activeSeries, language);
 
   function clearDrawing() {
     setUserStrokes([]);
@@ -127,21 +144,36 @@ export function KanaWritingPracticeScreen({
 
   function goToNextCharacter() {
     const nextResult = createPracticeResult();
-    const nextResults = [...results, nextResult];
+    const nextResults = [...results];
+    nextResults[currentIndex] = nextResult;
     setResults(nextResults);
 
-    if (currentIndex >= activeSeries.characters.length - 1) {
+    if (currentIndex >= practiceCharacters.length - 1) {
       setCompleted(true);
       setHelpGuideVisible(false);
       return;
     }
 
-    setCurrentIndex((index) => index + 1);
-    setUserStrokes([]);
+    const nextIndex = currentIndex + 1;
+    setCurrentIndex(nextIndex);
+    setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
+    setHelpGuideVisible(false);
+  }
+
+  function goToPreviousCharacter() {
+    if (currentIndex === 0) {
+      return;
+    }
+
+    commitCurrentResult();
+    const previousIndex = currentIndex - 1;
+    setCurrentIndex(previousIndex);
+    setUserStrokes(results[previousIndex]?.userStrokes ?? []);
     setHelpGuideVisible(false);
   }
 
   function restartPractice() {
+    setPracticeCharacters(shuffleCharacters(activeSeries.characters));
     setCurrentIndex(0);
     setUserStrokes([]);
     setCompleted(false);
@@ -153,8 +185,18 @@ export function KanaWritingPracticeScreen({
     setUserStrokes(nextStrokes);
   }
 
+  function commitCurrentResult() {
+    const nextResult = createPracticeResult();
+    setResults((currentResults) => {
+      const nextResults = [...currentResults];
+      nextResults[currentIndex] = nextResult;
+      return nextResults;
+    });
+  }
+
   function createPracticeResult(): WritingPracticeResult {
     return {
+      exampleImageKey: currentExample?.imageKey,
       kana: activeCharacter.kana,
       romaji: activeCharacter.romaji,
       userStrokes,
@@ -174,38 +216,35 @@ export function KanaWritingPracticeScreen({
           <View style={[styles.reviewFooter, { width: reviewWidth }]}>
             <CompletionModal
               compact={isCompactReview}
+              heroImageSource={reviewMascotImage}
+              nextLabel={
+                language === 'es'
+                  ? `Siguiente: ${nextSeriesLabel}`
+                  : `Next: ${nextSeriesLabel}`
+              }
               onChangeMode={onBack}
               onNext={onNextSeries}
               onRepeat={activeSeries.id === 'random' ? onRepeatSeries : restartPractice}
+              repeatLabel={
+                language === 'es'
+                  ? `Repetir ${activeSeriesLabel}`
+                  : `Repeat ${activeSeriesLabel}`
+              }
             />
           </View>
         }>
         <View style={[styles.reviewContent, { width: reviewWidth }]}>
-          <View
-            style={[
-              styles.reviewBody,
-              isWideReview ? styles.reviewBodyWide : styles.reviewBodyStacked,
-            ]}>
-            <View style={[styles.reviewMain, { width: reviewMainWidth }]}>
-              <WritingSequenceReview
-                availableWidth={reviewMainWidth}
-                compact={isCompactReview}
-                correctLabel={t.writing.correct}
-                results={results}
-                sourceCanvasSize={canvasSize}
-                title={t.writing.finalReviewTitle}
-                yourWritingLabel={t.writing.yourWriting}
-              />
-            </View>
-
-            <ReviewMascotPanel
-              imageSource={reviewMascotImage}
-              isWide={isWideReview}
+          <View style={[styles.reviewMain, { width: reviewMainWidth }]}>
+            <WritingSequenceReview
+              availableWidth={reviewMainWidth}
               compact={isCompactReview}
-              width={isWideReview ? reviewMascotColumnWidth : reviewWidth}
+              correctLabel={t.writing.correct}
+              results={results}
+              sourceCanvasSize={canvasSize}
+              title={t.writing.finalReviewTitle}
+              yourWritingLabel={t.writing.yourWriting}
             />
           </View>
-
         </View>
       </AppScreen>
     );
@@ -228,12 +267,24 @@ export function KanaWritingPracticeScreen({
       }
       footer={
         <View style={[styles.actions, { width: practiceWidth }]}>
-          <View style={styles.clearButton}>
-            <AppButton label={t.common.clear} onPress={clearDrawing} variant="secondary" />
-          </View>
-          <View style={styles.nextButton}>
-            <AppButton label={t.common.next} onPress={goToNextCharacter} />
-          </View>
+          <StepButton
+            disabled={currentIndex === 0}
+            label={language === 'es' ? 'Anterior' : 'Previous'}
+            onPress={goToPreviousCharacter}
+          />
+          <ClearIconButton label={t.common.clear} onPress={clearDrawing} />
+          <StepButton
+            disabled={!hasUserStrokes}
+            label={
+              currentIndex >= practiceCharacters.length - 1
+                ? language === 'es'
+                  ? 'Finalizar'
+                  : 'Finish'
+                : t.common.next
+            }
+            primary
+            onPress={goToNextCharacter}
+          />
         </View>
       }>
       <View style={[styles.content, { width: practiceWidth }]}>
@@ -296,6 +347,55 @@ function HelpButton({ label, onHide, onShow }: HelpButtonProps) {
   );
 }
 
+type StepButtonProps = {
+  disabled?: boolean;
+  label: string;
+  primary?: boolean;
+  onPress: () => void;
+};
+
+function StepButton({ disabled = false, label, primary = false, onPress }: StepButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.stepButton,
+        primary ? styles.stepButtonPrimary : styles.stepButtonSecondary,
+        disabled ? styles.stepButtonDisabled : null,
+        pressed && !disabled ? styles.stepButtonPressed : null,
+      ]}>
+      <Text
+        style={[
+          styles.stepButtonText,
+          primary ? styles.stepButtonTextPrimary : null,
+          disabled ? styles.stepButtonTextDisabled : null,
+        ]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+type ClearIconButtonProps = {
+  label: string;
+  onPress: () => void;
+};
+
+function ClearIconButton({ label, onPress }: ClearIconButtonProps) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.clearIconButton, pressed ? styles.stepButtonPressed : null]}>
+      <MaterialIcons name="delete-outline" size={24} color={colors.primary} />
+    </Pressable>
+  );
+}
+
 type ReviewMascotPanelProps = {
   compact: boolean;
   imageSource?: ImageSourcePropType;
@@ -303,7 +403,7 @@ type ReviewMascotPanelProps = {
   width: number;
 };
 
-function ReviewMascotPanel({ compact, imageSource, isWide, width }: ReviewMascotPanelProps) {
+export function ReviewMascotPanel({ compact, imageSource, isWide, width }: ReviewMascotPanelProps) {
   if (!imageSource) {
     return null;
   }
@@ -457,13 +557,99 @@ const styles = StyleSheet.create({
   actions: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     justifyContent: 'space-between',
   },
-  clearButton: {
-    flexShrink: 0,
-  },
-  nextButton: {
+  stepButton: {
+    alignItems: 'center',
+    borderRadius: 999,
     flex: 1,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  stepButtonPrimary: {
+    backgroundColor: colors.primary,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 1,
+  },
+  stepButtonSecondary: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
+  stepButtonDisabled: {
+    backgroundColor: colors.disabledSurface,
+    borderColor: colors.border,
+    opacity: 0.62,
+  },
+  stepButtonPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.98 }],
+  },
+  stepButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  stepButtonTextPrimary: {
+    color: colors.onPrimary,
+  },
+  stepButtonTextDisabled: {
+    color: colors.disabledText,
+  },
+  clearIconButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
   },
 });
+
+function shuffleCharacters(characters: KanaSeries['characters']) {
+  const shuffledCharacters = [...characters];
+
+  for (let index = shuffledCharacters.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    const currentCharacter = shuffledCharacters[index];
+    shuffledCharacters[index] = shuffledCharacters[randomIndex];
+    shuffledCharacters[randomIndex] = currentCharacter;
+  }
+
+  return shuffledCharacters;
+}
+
+function getNextSeriesForReview(currentSeries: KanaSeries) {
+  if (currentSeries.id === 'random') {
+    return currentSeries;
+  }
+
+  const currentIndex = hiraganaSeries.findIndex((item) => item.id === currentSeries.id);
+
+  if (currentIndex === -1) {
+    return hiraganaSeries[0] ?? currentSeries;
+  }
+
+  return hiraganaSeries[(currentIndex + 1) % hiraganaSeries.length];
+}
+
+function getReviewSeriesLabel(series: KanaSeries, language: 'en' | 'es') {
+  if (series.id === 'random') {
+    return language === 'es' ? 'random' : 'random';
+  }
+
+  if (series.id === 'vowels') {
+    return language === 'es' ? 'Vocales' : 'Vowels';
+  }
+
+  return series.title.replace(/ Series$/u, '');
+}

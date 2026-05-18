@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 
 import { AppButton } from '@/src/shared/components/AppButton';
 import { colors } from '@/src/shared/constants/colors';
@@ -7,23 +7,37 @@ import { useTranslation } from '@/src/shared/i18n/useTranslation';
 
 type CompletionModalProps = {
   compact?: boolean;
+  heroImageSource?: ImageSourcePropType;
+  nextLabel?: string;
   onChangeMode: () => void;
   onNext: () => void;
   onRepeat: () => void;
+  repeatLabel?: string;
 };
 
 export function CompletionModal({
   compact = false,
+  heroImageSource,
+  nextLabel,
   onChangeMode,
   onNext,
   onRepeat,
+  repeatLabel,
 }: CompletionModalProps) {
   const { t } = useTranslation();
 
   return (
     <View style={[styles.card, compact ? styles.compactCard : null]}>
       <View style={[styles.halo, compact ? styles.compactHalo : null]}>
-        <Text style={[styles.mark, compact ? styles.compactMark : null]}>✓</Text>
+        {heroImageSource ? (
+          <Image
+            resizeMode="contain"
+            source={heroImageSource}
+            style={[styles.heroImage, compact ? styles.compactHeroImage : null]}
+          />
+        ) : (
+          <Text style={[styles.mark, compact ? styles.compactMark : null]}>✓</Text>
+        )}
       </View>
 
       <View style={[styles.copy, compact ? styles.compactCopy : null]}>
@@ -36,14 +50,14 @@ export function CompletionModal({
       <View style={[styles.actions, compact ? styles.compactActions : null]}>
         <View style={styles.action}>
           <AppButton
-            label={t.common.next}
+            label={nextLabel ?? t.common.next}
             onPress={onNext}
             size={compact ? 'compact' : 'regular'}
           />
         </View>
         <View style={styles.action}>
           <AppButton
-            label={t.common.repeat}
+            label={repeatLabel ?? t.common.repeat}
             onPress={onRepeat}
             size={compact ? 'compact' : 'regular'}
             variant="secondary"
@@ -70,29 +84,39 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     borderRadius: radii.panel,
     borderWidth: 1,
-    gap: 18,
+    gap: 14,
     maxWidth: 560,
-    padding: 22,
+    padding: 20,
     width: '100%',
     ...softShadow,
   },
   compactCard: {
     borderRadius: radii.card,
-    gap: 8,
+    gap: 7,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   halo: {
     alignItems: 'center',
-    backgroundColor: pastelColors.mint,
+    backgroundColor: pastelColors.yellow,
+    borderColor: colors.border,
     borderRadius: radii.pill,
-    height: 88,
+    borderWidth: 1,
+    height: 104,
     justifyContent: 'center',
-    width: 88,
+    width: 104,
   },
   compactHalo: {
-    height: 38,
-    width: 38,
+    height: 54,
+    width: 54,
+  },
+  heroImage: {
+    height: 92,
+    width: 92,
+  },
+  compactHeroImage: {
+    height: 48,
+    width: 48,
   },
   mark: {
     color: colors.success,
