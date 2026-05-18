@@ -23,6 +23,7 @@ export type CanvasSize = {
 type DrawingCanvasProps = {
   guideCharacter: string;
   disabled?: boolean;
+  maxSize?: number;
   showGuide: boolean;
   strokes: StrokePoint[][];
   onChangeCanvasSize?: (canvasSize: CanvasSize) => void;
@@ -36,6 +37,7 @@ const inkWashStrokeWidth = 22;
 export function DrawingCanvas({
   guideCharacter,
   disabled = false,
+  maxSize,
   showGuide,
   strokes,
   onChangeCanvasSize,
@@ -122,7 +124,7 @@ export function DrawingCanvas({
 
   return (
     <View
-      style={styles.canvasFrame}
+      style={[styles.canvasFrame, maxSize ? { maxWidth: maxSize } : null]}
       onLayout={handleLayout}
       {...panResponder.panHandlers}>
       <View pointerEvents="none" style={styles.paperLayer}>

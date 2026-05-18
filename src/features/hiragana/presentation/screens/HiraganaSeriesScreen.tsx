@@ -13,36 +13,39 @@ import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 type HiraganaSeriesScreenProps = {
   series: KanaSeries[];
   onBack: () => void;
+  onOpenVocabulary: () => void;
   onOpenSeriesPractice: () => void;
   onSelectRandom: () => void;
 };
 
 const screenPadding = 14;
-const maxContentWidth = 760;
+const maxContentWidth = 900;
 const cardGap = 12;
 
 export function HiraganaSeriesScreen({
   series,
   onBack,
+  onOpenVocabulary,
   onOpenSeriesPractice,
   onSelectRandom,
 }: HiraganaSeriesScreenProps) {
   const { t } = useTranslation();
   const { isMobile, width } = useResponsiveLayout();
   const contentWidth = Math.min(width - screenPadding * 2, maxContentWidth);
-  const cardWidth = isMobile ? contentWidth : Math.floor((contentWidth - cardGap) / 2);
+  const columnCount = isMobile ? 1 : contentWidth >= 780 ? 3 : 2;
+  const cardWidth = Math.floor((contentWidth - cardGap * (columnCount - 1)) / columnCount);
   const randomKanaCount = series.reduce((total, item) => total + item.characters.length, 0);
 
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
-      <KawaiiBackground kana={['ひ', 'ら', 'な']} />
+      <KawaiiBackground kana={['\u3072', '\u3089', '\u306a']} />
       <View style={[styles.content, { width: contentWidth }]}>
         <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>{`← ${t.common.back}`}</Text>
+          <Text style={styles.backText}>{`< ${t.common.back}`}</Text>
         </Pressable>
 
         <View style={styles.header}>
-          <Text style={styles.japaneseTitle}>ひらがな</Text>
+          <Text style={styles.japaneseTitle}>{'\u3072\u3089\u304c\u306a'}</Text>
           <Text style={styles.title}>{t.hiragana.title}</Text>
           <Text style={styles.subtitle}>{t.hiragana.subtitle}</Text>
         </View>
@@ -50,7 +53,7 @@ export function HiraganaSeriesScreen({
         <View style={[styles.choiceGrid, isMobile ? styles.choiceGridStacked : null]}>
           <HiraganaChoiceCard
             index={0}
-            kana="乱"
+            kana={'\u4e71'}
             title={t.hiragana.randomTitle}
             subtitle={formatTranslation(t.hiragana.randomSubtitle, {
               count: String(randomKanaCount),
@@ -60,11 +63,19 @@ export function HiraganaSeriesScreen({
           />
           <HiraganaChoiceCard
             index={1}
-            kana="列"
+            kana={'\u5217'}
             title={t.hiragana.seriesPracticeTitle}
             subtitle={t.hiragana.seriesPracticeSubtitle}
             width={cardWidth}
             onPress={onOpenSeriesPractice}
+          />
+          <HiraganaChoiceCard
+            index={2}
+            kana={'\u8a00'}
+            title={t.hiragana.vocabularyTitle}
+            subtitle={t.hiragana.vocabularySubtitle}
+            width={cardWidth}
+            onPress={onOpenVocabulary}
           />
         </View>
       </View>

@@ -74,6 +74,8 @@ export const translations = {
       randomSubtitle: 'Practice random hiragana kana from all {{count}} available kana',
       seriesPracticeTitle: 'Practice by series',
       seriesPracticeSubtitle: 'Choose a series and train its kana',
+      vocabularyTitle: 'Vocabulary practice',
+      vocabularySubtitle: 'Look at a picture and write the word in Japanese or romaji',
     },
     quiz: {
       title: 'Romaji quiz',
@@ -87,16 +89,16 @@ export const translations = {
   },
   es: {
     language: {
-      english: 'Inglés',
+      english: 'Ingl\u00e9s',
       label: 'Idioma',
-      spanish: 'Español',
+      spanish: 'Espa\u00f1ol',
     },
     home: {
       title: 'Singra Kana',
-      subtitle: 'Aprende japonés paso a paso',
-      hiraganaSubtitle: 'Empieza con el silabario kana básico',
-      katakanaSubtitle: 'Más adelante',
-      kanjiSubtitle: 'Más adelante',
+      subtitle: 'Aprende japon\u00e9s paso a paso',
+      hiraganaSubtitle: 'Empieza con el silabario kana b\u00e1sico',
+      katakanaSubtitle: 'M\u00e1s adelante',
+      kanjiSubtitle: 'M\u00e1s adelante',
       mascotLabel: 'Singra, mascota de la app',
     },
     common: {
@@ -109,30 +111,30 @@ export const translations = {
       repeat: 'Repetir',
       changeMode: 'Cambiar modo',
       chooseAnotherSeries: 'Elegir otra serie',
-      comingSoon: 'Próximamente',
+      comingSoon: 'Pr\u00f3ximamente',
     },
     writing: {
-      title: 'Práctica de escritura',
+      title: 'Pr\u00e1ctica de escritura',
       kanaIntro: 'Este es el kana {{kana}}',
       pronunciation: 'Se pronuncia: {{romaji}}',
       exampleIntro: 'Una palabra de ejemplo es:',
       traceInstruction: 'Traza con el dedo',
       memoryInstruction: 'Escribe de memoria',
       usedIn: 'Se usa en:',
-      finalReviewTitle: 'Revisión final',
+      finalReviewTitle: 'Revisi\u00f3n final',
       yourWriting: 'Tu escritura',
       correct: 'Correcto',
     },
     practiceModes: {
       screenTitleSeries: 'Serie {{series}}',
-      subtitle: 'Elige cómo quieres practicar esta serie',
+      subtitle: 'Elige c\u00f3mo quieres practicar esta serie',
       trace: {
-        title: 'Trazar con guía',
-        description: 'Copia cada kana siguiendo la guía',
+        title: 'Trazar con gu\u00eda',
+        description: 'Copia cada kana siguiendo la gu\u00eda',
       },
       memory: {
         title: 'Escritura de memoria',
-        description: 'Escribe cada kana sin la guía',
+        description: 'Escribe cada kana sin la gu\u00eda',
       },
       romaji: {
         title: 'Quiz de romaji',
@@ -144,7 +146,7 @@ export const translations = {
       },
       speed: {
         title: 'Velocidad',
-        description: 'Responde rápido antes de que acabe el tiempo',
+        description: 'Responde r\u00e1pido antes de que acabe el tiempo',
       },
       listening: {
         title: 'Escucha',
@@ -153,11 +155,13 @@ export const translations = {
     },
     hiragana: {
       title: 'Hiragana',
-      subtitle: 'Elige cómo quieres practicar',
+      subtitle: 'Elige c\u00f3mo quieres practicar',
       randomTitle: 'Modo random',
       randomSubtitle: 'Practica kanas aleatorios de hiragana entre los {{count}} disponibles',
-      seriesPracticeTitle: 'Práctica por series',
+      seriesPracticeTitle: 'Pr\u00e1ctica por series',
       seriesPracticeSubtitle: 'Elige una serie y entrena sus kanas',
+      vocabularyTitle: 'Pr\u00e1ctica de vocabulario',
+      vocabularySubtitle: 'Mira una imagen y escribe la palabra en japon\u00e9s o romaji',
     },
     quiz: {
       title: 'Quiz de romaji',
@@ -165,8 +169,8 @@ export const translations = {
       correctAnswer: 'Respuesta correcta',
     },
     completion: {
-      title: 'Práctica completada',
-      subtitle: 'Buen trabajo. ¿Qué quieres hacer ahora?',
+      title: 'Pr\u00e1ctica completada',
+      subtitle: 'Buen trabajo. \u00bfQu\u00e9 quieres hacer ahora?',
     },
   },
 } as const;

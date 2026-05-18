@@ -1,20 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type ImageSourcePropType,
 } from 'react-native';
 
 import { checkRomajiAnswer } from '@/src/features/hiragana/application/useCases/checkRomajiAnswer';
+import type { KanaCharacter } from '@/src/features/hiragana/domain/models/KanaCharacter';
+import type { KanaExample } from '@/src/features/hiragana/domain/models/KanaExample';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import { hiraganaSeries } from '@/src/features/hiragana/infrastructure/data/hiraganaSeries';
+import { kanaExamples } from '@/src/features/hiragana/infrastructure/data/kanaExamples';
+import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { AppButton } from '@/src/shared/components/AppButton';
-import { CompletionModal } from '@/src/shared/components/CompletionModal';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -28,6 +34,15 @@ type RomajiQuizScreenProps = {
   onRepeatSeries: () => void;
 };
 
+type QuizAttempt = {
+  character: KanaCharacter;
+  correctAnswer: string;
+  example?: KanaExample;
+  imageSource?: ImageSourcePropType;
+  isCorrect: boolean;
+  userAnswer: string;
+};
+
 export function RomajiQuizScreen({
   series: providedSeries,
   seriesId,
@@ -35,27 +50,47 @@ export function RomajiQuizScreen({
   onNextSeries,
   onRepeatSeries,
 }: RomajiQuizScreenProps) {
-  const { t } = useTranslation();
+  const { language, t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
+  const resultTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const series = providedSeries ?? hiraganaSeries.find((item) => item.id === seriesId);
+  const initialItems = useMemo(() => series?.characters ?? [], [series]);
+  const [quizItems, setQuizItems] = useState<KanaCharacter[]>(initialItems);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState('');
-  const [checked, setChecked] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [expectedAnswers, setExpectedAnswers] = useState<string[]>([]);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [completed, setCompleted] = useState(false);
+  const [resultAttempt, setResultAttempt] = useState<QuizAttempt | undefined>();
+  const [correctedAllFailures, setCorrectedAllFailures] = useState(false);
 
   useEffect(() => {
-    if (!checked && !completed) {
+    setQuizItems(initialItems);
+    setCurrentIndex(0);
+    setAnswer('');
+    setAttempts([]);
+    setCompleted(false);
+    setResultAttempt(undefined);
+    setCorrectedAllFailures(false);
+  }, [initialItems]);
+
+  useEffect(() => {
+    if (!completed && !resultAttempt) {
       const timer = setTimeout(() => inputRef.current?.focus(), 120);
       return () => clearTimeout(timer);
     }
 
     return undefined;
-  }, [checked, completed, currentIndex]);
+  }, [completed, currentIndex, resultAttempt]);
 
-  if (!series) {
+  useEffect(() => {
+    return () => {
+      if (resultTimerRef.current) {
+        clearTimeout(resultTimerRef.current);
+      }
+    };
+  }, []);
+
+  if (!series || quizItems.length === 0) {
     return (
       <View style={styles.root}>
         <KawaiiBackground />
@@ -66,27 +101,47 @@ export function RomajiQuizScreen({
     );
   }
 
-  const selectedSeries = series;
-  const currentCharacter = selectedSeries.characters[currentIndex];
+  const activeSeries = series;
+  const currentCharacter = quizItems[currentIndex];
+  const failures = attempts.filter((attempt) => !attempt.isCorrect);
+  const correctCount = attempts.filter((attempt) => attempt.isCorrect).length;
 
   function checkAnswer() {
-    if (checked) {
+    if (resultAttempt) {
       return;
     }
 
     const result = checkRomajiAnswer(currentCharacter, answer);
-    setIsCorrect(result.isCorrect);
-    setExpectedAnswers(result.expectedAnswers);
-    setChecked(true);
+    const example = getQuizExample(currentCharacter.kana);
+    const attempt: QuizAttempt = {
+      character: currentCharacter,
+      correctAnswer: result.expectedAnswers[0],
+      example,
+      imageSource: getVocabularyImage(example?.imageKey),
+      isCorrect: result.isCorrect,
+      userAnswer: answer.trim(),
+    };
+
+    setAttempts((currentAttempts) => [...currentAttempts, attempt]);
+    setResultAttempt(attempt);
     Keyboard.dismiss();
 
-    if (result.isCorrect) {
-      setCorrectCount((count) => count + 1);
+    if (resultTimerRef.current) {
+      clearTimeout(resultTimerRef.current);
     }
+
+    resultTimerRef.current = setTimeout(goToNextCharacter, 2600);
   }
 
   function goToNextCharacter() {
-    if (currentIndex >= selectedSeries.characters.length - 1) {
+    if (resultTimerRef.current) {
+      clearTimeout(resultTimerRef.current);
+      resultTimerRef.current = undefined;
+    }
+
+    setResultAttempt(undefined);
+
+    if (currentIndex >= quizItems.length - 1) {
       setCompleted(true);
       Keyboard.dismiss();
       return;
@@ -94,55 +149,75 @@ export function RomajiQuizScreen({
 
     setCurrentIndex((index) => index + 1);
     setAnswer('');
-    setChecked(false);
-    setIsCorrect(false);
-    setExpectedAnswers([]);
   }
 
   function restartQuiz() {
+    startRound(activeSeries.id === 'random' ? quizItems : initialItems, false);
+  }
+
+  function repeatFailures() {
+    if (failures.length === 0) {
+      return;
+    }
+
+    startRound(
+      failures.map((attempt) => attempt.character),
+      true,
+    );
+  }
+
+  function startRound(nextItems: KanaCharacter[], cameFromFailures: boolean) {
+    setQuizItems(nextItems);
     setCurrentIndex(0);
     setAnswer('');
-    setChecked(false);
-    setIsCorrect(false);
-    setCorrectCount(0);
-    setExpectedAnswers([]);
+    setAttempts([]);
     setCompleted(false);
+    setResultAttempt(undefined);
+    setCorrectedAllFailures(cameFromFailures && nextItems.length > 0);
+  }
+
+  if (resultAttempt) {
+    return (
+      <QuizResultScreen
+        attempt={resultAttempt}
+        language={language}
+        nextLabel={t.common.next}
+        onNext={goToNextCharacter}
+      />
+    );
   }
 
   if (completed) {
     return (
-      <View style={styles.root}>
-        <KawaiiBackground kana={['正', '答', 'あ']} />
-        <View style={styles.quizContainer}>
-          <QuizHeader title={t.quiz.title} backLabel={t.common.back} onBack={onBack} />
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryHalo}>
-              <Text style={styles.summary}>
-                {correctCount} / {selectedSeries.characters.length}
-              </Text>
-            </View>
-          </View>
-
-          <CompletionModal
-            onChangeMode={onBack}
-            onNext={onNextSeries}
-            onRepeat={selectedSeries.id === 'random' ? onRepeatSeries : restartQuiz}
-          />
-        </View>
-      </View>
+      <QuizSummaryScreen
+        attempts={attempts}
+        backLabel={t.common.back}
+        changeModeLabel={t.common.changeMode}
+        correctedAllFailures={correctedAllFailures && failures.length === 0}
+        correctCount={correctCount}
+        language={language}
+        nextLabel={language === 'es' ? 'Siguiente serie' : 'Next series'}
+        repeatFailuresLabel={language === 'es' ? 'Repetir fallos' : 'Repeat misses'}
+        repeatSeriesLabel={language === 'es' ? 'Repetir serie' : 'Repeat series'}
+        title={t.quiz.title}
+        totalCount={attempts.length}
+        onBack={onBack}
+        onNextSeries={onNextSeries}
+        onRepeatFailures={repeatFailures}
+        onRepeatSeries={activeSeries.id === 'random' ? onRepeatSeries : restartQuiz}
+      />
     );
   }
 
   return (
     <View style={styles.root}>
-      <KawaiiBackground kana={['ろ', currentCharacter.kana, '字']} />
+      <KawaiiBackground kana={['romaji', currentCharacter.kana, 'kana']} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.quizContainer}>
         <QuizHeader
           title={t.quiz.title}
-          subtitle={selectedSeries.title}
+          subtitle={activeSeries.title}
           backLabel={t.common.back}
           onBack={onBack}
         />
@@ -158,34 +233,192 @@ export function RomajiQuizScreen({
           autoCapitalize="none"
           autoCorrect={false}
           blurOnSubmit
-          editable={!checked}
           onChangeText={setAnswer}
           onSubmitEditing={checkAnswer}
-          placeholder="Type romaji"
+          placeholder={language === 'es' ? 'Escribe romaji' : 'Type romaji'}
           placeholderTextColor={colors.disabledText}
           returnKeyType="done"
           style={styles.quizInput}
           value={answer}
         />
 
-        {checked ? (
-          <View style={[styles.feedbackBadge, isCorrect ? styles.correctBadge : styles.incorrectBadge]}>
-            <Text style={[styles.feedback, isCorrect ? styles.correct : styles.incorrect]}>
-              {isCorrect ? t.quiz.correct : `${t.quiz.correctAnswer}: ${expectedAnswers[0]}`}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.feedbackSpacer} />
-        )}
-
         <View style={styles.quizActionButton}>
-          {checked ? (
-            <AppButton label={t.common.next} onPress={goToNextCharacter} />
-          ) : (
-            <AppButton label={t.common.check} onPress={checkAnswer} />
-          )}
+          <AppButton label={t.common.check} onPress={checkAnswer} />
         </View>
       </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+type QuizResultScreenProps = {
+  attempt: QuizAttempt;
+  language: 'en' | 'es';
+  nextLabel: string;
+  onNext: () => void;
+};
+
+function QuizResultScreen({ attempt, language, nextLabel, onNext }: QuizResultScreenProps) {
+  const wordLabel = attempt.example?.romaji ?? attempt.correctAnswer;
+  const meaning =
+    attempt.example && language === 'es' ? attempt.example.meaningEs : attempt.example?.meaningEn;
+
+  return (
+    <View style={styles.root}>
+      <KawaiiBackground kana={[attempt.character.kana, attempt.correctAnswer.toUpperCase(), 'OK']} />
+      <View style={styles.resultContainer}>
+        <View style={styles.resultCard}>
+          <Text style={styles.resultMood}>
+            {attempt.isCorrect
+              ? language === 'es'
+                ? 'Bien'
+                : 'Nice'
+              : language === 'es'
+                ? 'Buen intento'
+                : 'Good try'}
+          </Text>
+          <Text style={styles.resultRomaji}>{attempt.correctAnswer.toUpperCase()}</Text>
+          <Text style={styles.resultWord}>
+            {language === 'es' ? `como ${wordLabel}` : `as in ${wordLabel}`}
+          </Text>
+          {attempt.example?.word ? (
+            <Text style={styles.resultKanaWord}>{attempt.example.word}</Text>
+          ) : null}
+          {meaning ? <Text style={styles.resultMeaning}>{meaning}</Text> : null}
+
+          {attempt.imageSource ? (
+            <View style={styles.resultImageFrame}>
+              <Image resizeMode="contain" source={attempt.imageSource} style={styles.resultImage} />
+            </View>
+          ) : null}
+
+          {!attempt.isCorrect ? (
+            <View style={styles.answerCorrection}>
+              <Text style={styles.answerCorrectionText}>
+                {language === 'es' ? 'Tu respuesta' : 'Your answer'}:{' '}
+                {attempt.userAnswer || '...'}
+              </Text>
+              <Text style={styles.answerCorrectionText}>
+                {language === 'es' ? 'Correcta' : 'Correct'}: {attempt.correctAnswer}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.resultNextButton}>
+            <AppButton label={nextLabel} onPress={onNext} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+type QuizSummaryScreenProps = {
+  attempts: QuizAttempt[];
+  backLabel: string;
+  changeModeLabel: string;
+  correctedAllFailures: boolean;
+  correctCount: number;
+  language: 'en' | 'es';
+  nextLabel: string;
+  repeatFailuresLabel: string;
+  repeatSeriesLabel: string;
+  title: string;
+  totalCount: number;
+  onBack: () => void;
+  onNextSeries: () => void;
+  onRepeatFailures: () => void;
+  onRepeatSeries: () => void;
+};
+
+function QuizSummaryScreen({
+  attempts,
+  backLabel,
+  changeModeLabel,
+  correctedAllFailures,
+  correctCount,
+  language,
+  nextLabel,
+  repeatFailuresLabel,
+  repeatSeriesLabel,
+  title,
+  totalCount,
+  onBack,
+  onNextSeries,
+  onRepeatFailures,
+  onRepeatSeries,
+}: QuizSummaryScreenProps) {
+  const failures = attempts.filter((attempt) => !attempt.isCorrect);
+  const percentage = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+
+  return (
+    <View style={styles.root}>
+      <KawaiiBackground kana={['summary', 'OK', 'romaji']} />
+      <View style={styles.summaryContainer}>
+        <QuizHeader title={title} backLabel={backLabel} onBack={onBack} />
+
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>
+            {correctCount} / {totalCount}
+          </Text>
+          <Text style={styles.summarySubtitle}>
+            {language === 'es'
+              ? `${correctCount} aciertos - ${failures.length} fallos - ${percentage}%`
+              : `${correctCount} correct - ${failures.length} misses - ${percentage}%`}
+          </Text>
+          {correctedAllFailures ? (
+            <Text style={styles.perfectMessage}>
+              {language === 'es'
+                ? 'Perfecto! Has corregido todos los fallos.'
+                : 'Perfect! You fixed every miss.'}
+            </Text>
+          ) : null}
+        </View>
+
+        {failures.length > 0 ? (
+          <ScrollView
+            contentContainerStyle={styles.missList}
+            showsVerticalScrollIndicator={false}
+            style={styles.missListScroll}>
+            {failures.map((failure, index) => (
+              <MissItem key={`${failure.character.id}-${index}`} attempt={failure} language={language} />
+            ))}
+          </ScrollView>
+        ) : null}
+
+        <View style={styles.summaryActions}>
+          {failures.length > 0 ? (
+            <AppButton label={repeatFailuresLabel} onPress={onRepeatFailures} />
+          ) : null}
+          <AppButton label={repeatSeriesLabel} onPress={onRepeatSeries} variant="secondary" />
+          <AppButton label={nextLabel} onPress={onNextSeries} />
+          <AppButton label={changeModeLabel} onPress={onBack} variant="secondary" />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function MissItem({ attempt, language }: { attempt: QuizAttempt; language: 'en' | 'es' }) {
+  const wordLabel = attempt.example?.romaji ?? attempt.correctAnswer;
+
+  return (
+    <View style={styles.missItem}>
+      {attempt.imageSource ? (
+        <View style={styles.missImageFrame}>
+          <Image resizeMode="contain" source={attempt.imageSource} style={styles.missImage} />
+        </View>
+      ) : null}
+      <View style={styles.missCopy}>
+        <Text style={styles.missKana}>{attempt.character.kana}</Text>
+        <Text style={styles.missWord}>
+          {wordLabel}
+          {attempt.example?.word ? ` - ${attempt.example.word}` : ''}
+        </Text>
+        <Text style={styles.missAnswers}>
+          {language === 'es' ? 'Tu respuesta' : 'Your answer'}: {attempt.userAnswer || '...'} -{' '}
+          {language === 'es' ? 'Correcta' : 'Correct'}: {attempt.correctAnswer}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -201,12 +434,16 @@ function QuizHeader({ backLabel, title, subtitle, onBack }: QuizHeaderProps) {
   return (
     <View style={styles.quizHeader}>
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.quizBackButton}>
-        <Text style={styles.quizBackText}>{`← ${backLabel}`}</Text>
+        <Text style={styles.quizBackText}>{`< ${backLabel}`}</Text>
       </Pressable>
       <Text style={styles.quizTitle}>{title}</Text>
       {subtitle ? <Text style={styles.quizSubtitle}>{subtitle}</Text> : null}
     </View>
   );
+}
+
+function getQuizExample(kana: string) {
+  return kanaExamples.find((example) => example.kana === kana);
 }
 
 const styles = StyleSheet.create({
@@ -285,45 +522,100 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: colors.text,
     fontSize: 22,
+    fontWeight: '800',
     minHeight: 58,
     paddingHorizontal: 14,
     textAlign: 'center',
-    fontWeight: '800',
     ...softShadow,
   },
   quizActionButton: {
     alignSelf: 'stretch',
   },
-  feedback: {
+  resultContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 18,
+  },
+  resultCard: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.panel,
+    borderWidth: 1,
+    gap: 7,
+    maxWidth: 560,
+    padding: 18,
+    width: '100%',
+    ...softShadow,
+  },
+  resultMood: {
+    color: colors.primary,
     fontSize: 17,
+    fontWeight: '900',
+  },
+  resultRomaji: {
+    color: colors.text,
+    fontSize: 58,
+    fontWeight: '900',
+    lineHeight: 66,
+  },
+  resultWord: {
+    color: colors.text,
+    fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
   },
-  feedbackBadge: {
+  resultKanaWord: {
+    color: colors.mutedText,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  resultMeaning: {
+    color: colors.mutedText,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  resultImageFrame: {
     alignItems: 'center',
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    minHeight: 38,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.panel,
+    height: 220,
     justifyContent: 'center',
+    maxWidth: 320,
+    width: '100%',
+  },
+  resultImage: {
+    height: '95%',
+    width: '95%',
+  },
+  answerCorrection: {
+    alignItems: 'center',
+    backgroundColor: '#F8ECEA',
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 2,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
-  feedbackSpacer: {
-    minHeight: 38,
+  answerCorrectionText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
   },
-  correct: {
-    color: colors.success,
+  resultNextButton: {
+    alignSelf: 'stretch',
+    marginTop: 4,
   },
-  incorrect: {
-    color: colors.error,
-  },
-  correctBadge: {
-    backgroundColor: colors.successSurface,
-    borderColor: colors.successBorder,
-  },
-  incorrectBadge: {
-    backgroundColor: colors.errorSurface,
-    borderColor: colors.errorBorder,
+  summaryContainer: {
+    alignSelf: 'center',
+    flex: 1,
+    gap: 10,
+    justifyContent: 'center',
+    maxWidth: 720,
+    padding: 16,
+    width: '100%',
   },
   summaryCard: {
     alignItems: 'center',
@@ -331,22 +623,75 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     borderRadius: radii.panel,
     borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 220,
-    padding: 24,
+    gap: 6,
+    padding: 18,
     ...softShadow,
   },
-  summaryHalo: {
-    alignItems: 'center',
-    backgroundColor: pastelColors.mint,
-    borderRadius: radii.pill,
-    height: 150,
-    justifyContent: 'center',
-    width: 150,
-  },
-  summary: {
+  summaryTitle: {
     color: colors.text,
-    fontSize: 38,
+    fontSize: 42,
     fontWeight: '900',
+  },
+  summarySubtitle: {
+    color: colors.mutedText,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  perfectMessage: {
+    color: colors.success,
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  missListScroll: {
+    maxHeight: 230,
+  },
+  missList: {
+    gap: 8,
+  },
+  missItem: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 10,
+  },
+  missImageFrame: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    height: 58,
+    justifyContent: 'center',
+    width: 58,
+  },
+  missImage: {
+    height: '92%',
+    width: '92%',
+  },
+  missCopy: {
+    flex: 1,
+    gap: 1,
+  },
+  missKana: {
+    color: colors.primary,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  missWord: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  missAnswers: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  summaryActions: {
+    gap: 8,
   },
 });

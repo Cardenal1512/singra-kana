@@ -85,6 +85,7 @@ export function KanaWritingPracticeScreen({
   );
   const [currentExample, setCurrentExample] = useState<KanaExample | undefined>();
   const practiceWidth = Math.min(width - screenPadding * 2, maxPracticeWidth);
+  const canvasMaxSize = getCanvasMaxSize(width, height, practiceWidth);
   const reviewWidth = Math.min(width - screenPadding * 2, maxReviewWidth);
   const isCompactReview = width < 720 || height < 780;
   const reviewMainWidth = reviewWidth;
@@ -192,27 +193,41 @@ export function KanaWritingPracticeScreen({
 
     feedbackTimeoutRef.current = setTimeout(() => {
       setFeedback(undefined);
-      if (solutionTimeoutRef.current) {
-        clearTimeout(solutionTimeoutRef.current);
-      }
 
       const nextIndex = currentIndex + 1;
-      setSolutionKana(activeCharacter.kana);
-      setPendingNextIndex(nextIndex < practiceCharacters.length ? nextIndex : undefined);
-      setShowSingraSolution(true);
-      setHelpGuideVisible(false);
-      solutionTimeoutRef.current = setTimeout(() => {
-        setShowSingraSolution(false);
-
-        if (nextIndex >= practiceCharacters.length) {
-          setCompleted(true);
-          return;
+      if (!isTraceMode) {
+        if (solutionTimeoutRef.current) {
+          clearTimeout(solutionTimeoutRef.current);
         }
 
-        setCurrentIndex(nextIndex);
-        setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
-        setPendingNextIndex(undefined);
-      }, 3000);
+        setSolutionKana(activeCharacter.kana);
+        setPendingNextIndex(nextIndex < practiceCharacters.length ? nextIndex : undefined);
+        setShowSingraSolution(true);
+        setHelpGuideVisible(false);
+        solutionTimeoutRef.current = setTimeout(() => {
+          setShowSingraSolution(false);
+
+          if (nextIndex >= practiceCharacters.length) {
+            setCompleted(true);
+            return;
+          }
+
+          setCurrentIndex(nextIndex);
+          setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
+          setPendingNextIndex(undefined);
+        }, 3000);
+        return;
+      }
+
+      if (nextIndex >= practiceCharacters.length) {
+        setCompleted(true);
+        setHelpGuideVisible(false);
+        return;
+      }
+
+      setCurrentIndex(nextIndex);
+      setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
+      setHelpGuideVisible(false);
     }, 780);
   }
 
@@ -400,6 +415,7 @@ export function KanaWritingPracticeScreen({
         <View style={styles.canvasArea}>
           <DrawingCanvas
             guideCharacter={activeCharacter.kana}
+            maxSize={canvasMaxSize}
             showGuide={shouldShowGuide}
             strokes={userStrokes}
             onChangeCanvasSize={setCanvasSize}
@@ -607,17 +623,16 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   content: {
-    gap: 12,
+    gap: 10,
     position: 'relative',
     zIndex: 1,
   },
   topBar: {
     alignItems: 'center',
-    alignSelf: 'stretch',
+    alignSelf: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     minHeight: 38,
-    width: '100%',
     zIndex: 2,
   },
   reviewScreen: {
@@ -873,6 +888,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     alignItems: 'center',
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: 10,
     justifyContent: 'space-between',
@@ -983,4 +999,26 @@ function getFeedbackDisplay(
   };
 
   return `${message} ${marks[category]}`;
+}
+
+function getCanvasMaxSize(width: number, height: number, practiceWidth: number) {
+  const widthLimit = Math.min(practiceWidth, 460);
+
+  if (width >= 900) {
+    if (height < 780) {
+      return Math.min(widthLimit, 320);
+    }
+
+    if (height < 940) {
+      return Math.min(widthLimit, 380);
+    }
+
+    return Math.min(widthLimit, 430);
+  }
+
+  if (height < 760) {
+    return Math.min(widthLimit, 330);
+  }
+
+  return widthLimit;
 }

@@ -1,1 +1,1 @@
-export type PracticeMode = 'trace' | 'memory' | 'romajiQuiz';
+export type PracticeMode = 'trace' | 'memory' | 'romajiQuiz' | 'vocabulary';

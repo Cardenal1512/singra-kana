@@ -12,6 +12,7 @@ import { HomeScreen } from '@/src/features/hiragana/presentation/screens/HomeScr
 import { KanaWritingPracticeScreen } from '@/src/features/hiragana/presentation/screens/KanaWritingPracticeScreen';
 import { PracticeModeSelectionScreen } from '@/src/features/hiragana/presentation/screens/PracticeModeSelectionScreen';
 import { RomajiQuizScreen } from '@/src/features/hiragana/presentation/screens/RomajiQuizScreen';
+import { VocabularyPracticeScreen } from '@/src/features/hiragana/presentation/screens/VocabularyPracticeScreen';
 import { colors } from '@/src/shared/constants/colors';
 import { LanguageProvider } from '@/src/shared/i18n/useTranslation';
 import { AnimatedRouteContainer } from '@/src/shared/motion/AnimatedRouteContainer';
@@ -26,7 +27,8 @@ type AppRoute =
   | { name: 'practiceModes'; series: KanaSeries }
   | { name: 'flashcards'; series: KanaSeries }
   | { name: 'writingPractice'; mode: WritingMode; series: KanaSeries; fromSeriesPractice?: boolean }
-  | { name: 'romajiQuiz'; series: KanaSeries; fromSeriesPractice?: boolean };
+  | { name: 'romajiQuiz'; series: KanaSeries; fromSeriesPractice?: boolean }
+  | { name: 'vocabularyPractice' };
 
 export default function SingraKanaApp() {
   const [route, setRoute] = useState<AppRoute>({ name: 'home' });
@@ -49,6 +51,7 @@ export default function SingraKanaApp() {
             <HiraganaSeriesScreen
               series={hiraganaSeries}
               onBack={() => setRoute({ name: 'home' })}
+              onOpenVocabulary={() => setRoute({ name: 'vocabularyPractice' })}
               onSelectRandom={() => {
                 const randomSeries = createRandomKanaSeries(hiraganaSeries);
                 setRoute({ name: 'practiceModes', series: randomSeries });
@@ -77,6 +80,11 @@ export default function SingraKanaApp() {
                   return;
                 }
 
+                if (mode === 'vocabulary') {
+                  setRoute({ name: 'vocabularyPractice' });
+                  return;
+                }
+
                 setRoute({
                   name: 'writingPractice',
                   mode,
@@ -94,6 +102,11 @@ export default function SingraKanaApp() {
               onSelectMode={(mode) => {
                 if (mode === 'romajiQuiz') {
                   setRoute({ name: 'romajiQuiz', series: route.series });
+                  return;
+                }
+
+                if (mode === 'vocabulary') {
+                  setRoute({ name: 'vocabularyPractice' });
                   return;
                 }
 
@@ -166,6 +179,10 @@ export default function SingraKanaApp() {
                 })
               }
             />
+          ) : null}
+
+          {route.name === 'vocabularyPractice' ? (
+            <VocabularyPracticeScreen onBack={() => setRoute({ name: 'hiraganaSeries' })} />
           ) : null}
         </AnimatedRouteContainer>
       </LanguageProvider>
