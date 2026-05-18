@@ -29,8 +29,9 @@ type DrawingCanvasProps = {
   onChangeStrokes: (strokes: StrokePoint[][]) => void;
 };
 
-const strokeWidth = 14;
+const strokeWidth = 16;
 const dotRadius = strokeWidth / 2;
+const inkWashStrokeWidth = 22;
 
 export function DrawingCanvas({
   guideCharacter,
@@ -144,26 +145,48 @@ export function DrawingCanvas({
         height={canvasSize.height}
         viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}>
         {strokes.map((stroke, strokeIndex) => (
-          <Path
-            key={`stroke-${strokeIndex}`}
-            d={buildPath(stroke)}
-            stroke={colors.ink}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
+          <StrokePath key={`stroke-${strokeIndex}`} stroke={stroke} />
         ))}
-        <Path
-          d={buildPath(activeStroke)}
-          stroke={colors.ink}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
+        <StrokePath stroke={activeStroke} />
       </Svg>
     </View>
+  );
+}
+
+function StrokePath({ stroke }: { stroke: StrokePoint[] }) {
+  const path = buildPath(stroke);
+
+  if (!path) {
+    return null;
+  }
+
+  return (
+    <>
+      <Path
+        d={path}
+        stroke="rgba(23, 20, 18, 0.13)"
+        strokeWidth={inkWashStrokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Path
+        d={path}
+        stroke={colors.ink}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <Path
+        d={path}
+        stroke="rgba(255, 253, 247, 0.14)"
+        strokeWidth={Math.max(2, strokeWidth * 0.28)}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </>
   );
 }
 
@@ -183,10 +206,33 @@ export function buildPath(points: StrokePoint[]): string {
     ].join(' ');
   }
 
-  return [
-    `M ${firstPoint.x} ${firstPoint.y}`,
-    ...remainingPoints.map((point) => `L ${point.x} ${point.y}`),
-  ].join(' ');
+  if (points.length === 2) {
+    const [secondPoint] = remainingPoints;
+    return `M ${firstPoint.x} ${firstPoint.y} L ${secondPoint.x} ${secondPoint.y}`;
+  }
+
+  return buildSmoothPath(points);
+}
+
+function buildSmoothPath(points: StrokePoint[]) {
+  const [firstPoint] = points;
+  const commands = [`M ${firstPoint.x} ${firstPoint.y}`];
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const currentPoint = points[index];
+    const nextPoint = points[index + 1];
+    const midPoint = {
+      x: (currentPoint.x + nextPoint.x) / 2,
+      y: (currentPoint.y + nextPoint.y) / 2,
+    };
+
+    commands.push(`Q ${currentPoint.x} ${currentPoint.y} ${midPoint.x} ${midPoint.y}`);
+  }
+
+  const lastPoint = points[points.length - 1];
+  commands.push(`L ${lastPoint.x} ${lastPoint.y}`);
+
+  return commands.join(' ');
 }
 
 function getCanvasLocalPoint(

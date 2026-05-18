@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
   Image,
@@ -11,12 +11,18 @@ import {
 } from 'react-native';
 
 import { getKanaExamples } from '@/src/features/hiragana/application/useCases/getKanaExamples';
+import {
+  evaluateRelaxedWriting,
+  type RelaxedWritingEvaluation,
+} from '@/src/features/hiragana/application/useCases/evaluateRelaxedWriting';
 import type { KanaExample } from '@/src/features/hiragana/domain/models/KanaExample';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
 import type { StrokePoint } from '@/src/features/hiragana/domain/models/StrokePoint';
+import type { WritingTemplate } from '@/src/features/hiragana/domain/models/WritingTemplate';
 import type { WritingPracticeResult } from '@/src/features/hiragana/domain/models/WritingPracticeResult';
 import { hiraganaSeries } from '@/src/features/hiragana/infrastructure/data/hiraganaSeries';
+import { hiraganaWritingTemplates } from '@/src/features/hiragana/infrastructure/data/hiraganaWritingTemplates';
 import { StaticKanaExampleRepository } from '@/src/features/hiragana/infrastructure/repositories/StaticKanaExampleRepository';
 import {
   DrawingCanvas,
@@ -69,7 +75,11 @@ export function KanaWritingPracticeScreen({
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(initialCanvasSize);
   const [completed, setCompleted] = useState(false);
   const [helpGuideVisible, setHelpGuideVisible] = useState(false);
+  const [showSingraSolution, setShowSingraSolution] = useState(false);
+  const [solutionKana, setSolutionKana] = useState('');
+  const [pendingNextIndex, setPendingNextIndex] = useState<number | undefined>();
   const [results, setResults] = useState<WritingPracticeResult[]>([]);
+  const [feedback, setFeedback] = useState<RelaxedWritingEvaluation | undefined>();
   const [practiceCharacters, setPracticeCharacters] = useState<KanaSeries['characters']>(() =>
     series ? shuffleCharacters(series.characters) : [],
   );
@@ -80,6 +90,8 @@ export function KanaWritingPracticeScreen({
   const reviewMainWidth = reviewWidth;
   const selectedSeries = series;
   const currentCharacter = practiceCharacters[currentIndex];
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const solutionTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (!selectedSeries) {
@@ -92,6 +104,9 @@ export function KanaWritingPracticeScreen({
     setUserStrokes([]);
     setCompleted(false);
     setHelpGuideVisible(false);
+    setShowSingraSolution(false);
+    setSolutionKana('');
+    setPendingNextIndex(undefined);
     setResults([]);
   }, [selectedSeries]);
 
@@ -118,6 +133,17 @@ export function KanaWritingPracticeScreen({
     };
   }, [currentCharacter]);
 
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current) {
+        clearTimeout(feedbackTimeoutRef.current);
+      }
+      if (solutionTimeoutRef.current) {
+        clearTimeout(solutionTimeoutRef.current);
+      }
+    };
+  }, []);
+
   if (!selectedSeries || !currentCharacter) {
     return (
       <View style={styles.content}>
@@ -134,6 +160,11 @@ export function KanaWritingPracticeScreen({
   const exampleImage = getVocabularyImage(currentExample?.imageKey);
   const mascotImage = getMascotImage(currentExample?.mascotKey);
   const reviewMascotImage = getMascotImage('singraSearch');
+  const solutionPanelImage = getMascotImage('singraPanel');
+  const feedbackMascotImage = getMascotImage('singraGambate') ?? reviewMascotImage;
+  const writingTemplate = hiraganaWritingTemplates.find(
+    (template) => template.kana === activeCharacter.kana,
+  );
   const nextSeries = getNextSeriesForReview(activeSeries);
   const nextSeriesLabel = getReviewSeriesLabel(nextSeries, language);
   const activeSeriesLabel = getReviewSeriesLabel(activeSeries, language);
@@ -143,21 +174,46 @@ export function KanaWritingPracticeScreen({
   }
 
   function goToNextCharacter() {
-    const nextResult = createPracticeResult();
-    const nextResults = [...results];
-    nextResults[currentIndex] = nextResult;
-    setResults(nextResults);
-
-    if (currentIndex >= practiceCharacters.length - 1) {
-      setCompleted(true);
-      setHelpGuideVisible(false);
+    if (!hasUserStrokes || feedback) {
       return;
     }
 
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex);
-    setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
-    setHelpGuideVisible(false);
+    const evaluation = evaluateRelaxedWriting({
+      canvasSize,
+      kana: activeCharacter.kana,
+      strokes: userStrokes,
+      template: writingTemplate,
+    });
+    const nextResult = createPracticeResult(evaluation);
+    const nextResults = [...results];
+    nextResults[currentIndex] = nextResult;
+    setResults(nextResults);
+    setFeedback(evaluation);
+
+    feedbackTimeoutRef.current = setTimeout(() => {
+      setFeedback(undefined);
+      if (solutionTimeoutRef.current) {
+        clearTimeout(solutionTimeoutRef.current);
+      }
+
+      const nextIndex = currentIndex + 1;
+      setSolutionKana(activeCharacter.kana);
+      setPendingNextIndex(nextIndex < practiceCharacters.length ? nextIndex : undefined);
+      setShowSingraSolution(true);
+      setHelpGuideVisible(false);
+      solutionTimeoutRef.current = setTimeout(() => {
+        setShowSingraSolution(false);
+
+        if (nextIndex >= practiceCharacters.length) {
+          setCompleted(true);
+          return;
+        }
+
+        setCurrentIndex(nextIndex);
+        setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
+        setPendingNextIndex(undefined);
+      }, 3000);
+    }, 780);
   }
 
   function goToPreviousCharacter() {
@@ -178,6 +234,9 @@ export function KanaWritingPracticeScreen({
     setUserStrokes([]);
     setCompleted(false);
     setHelpGuideVisible(false);
+    setShowSingraSolution(false);
+    setSolutionKana('');
+    setPendingNextIndex(undefined);
     setResults([]);
   }
 
@@ -186,7 +245,13 @@ export function KanaWritingPracticeScreen({
   }
 
   function commitCurrentResult() {
-    const nextResult = createPracticeResult();
+    const evaluation = evaluateRelaxedWriting({
+      canvasSize,
+      kana: activeCharacter.kana,
+      strokes: userStrokes,
+      template: writingTemplate,
+    });
+    const nextResult = createPracticeResult(evaluation);
     setResults((currentResults) => {
       const nextResults = [...currentResults];
       nextResults[currentIndex] = nextResult;
@@ -194,19 +259,51 @@ export function KanaWritingPracticeScreen({
     });
   }
 
-  function createPracticeResult(): WritingPracticeResult {
+  function createPracticeResult(evaluation?: RelaxedWritingEvaluation): WritingPracticeResult {
     return {
       exampleImageKey: currentExample?.imageKey,
+      feedbackCategory: evaluation?.category,
+      feedbackLabel: evaluation?.message,
       kana: activeCharacter.kana,
       romaji: activeCharacter.romaji,
+      score: evaluation?.score,
       userStrokes,
     };
+  }
+
+  if (showSingraSolution) {
+    const nextKana =
+      pendingNextIndex === undefined ? undefined : practiceCharacters[pendingNextIndex]?.kana;
+
+    return (
+      <AppScreen background={<KawaiiBackground kana={['OK', solutionKana, nextKana ?? 'END']} />}>
+        <View style={[styles.solutionContent, { width: practiceWidth }]}>
+          <View style={styles.solutionCopy}>
+            <Text style={styles.solutionTitle}>
+              {language === 'es' ? 'La respuesta correcta' : 'Correct answer'}
+            </Text>
+            <Text style={styles.solutionSubtitle}>
+              {language === 'es' ? 'Singra te la enseña' : 'Singra shows you'}
+            </Text>
+          </View>
+
+          <View style={styles.solutionImageWrap}>
+            {solutionPanelImage ? (
+              <Image resizeMode="contain" source={solutionPanelImage} style={styles.solutionImage} />
+            ) : null}
+            <View style={styles.solutionBoardTextWrap}>
+              <Text style={styles.solutionKana}>{solutionKana}</Text>
+            </View>
+          </View>
+        </View>
+      </AppScreen>
+    );
   }
 
   if (completed) {
     return (
       <AppScreen
-        background={<KawaiiBackground kana={['見', '直', 'あ']} />}
+        background={<KawaiiBackground kana={['review', 'OK', 'kana']} />}
         header={
           <View style={[styles.reviewHeader, { width: reviewWidth }]}>
             <WritingBackButton label={t.common.back} onPress={onBack} />
@@ -252,7 +349,7 @@ export function KanaWritingPracticeScreen({
 
   return (
     <AppScreen
-      background={<KawaiiBackground kana={['書', activeCharacter.kana, 'ん']} />}
+      background={<KawaiiBackground kana={['write', activeCharacter.kana, 'kana']} />}
       header={
         <View style={[styles.topBar, { width: practiceWidth }]}>
           <WritingBackButton label={t.common.back} onPress={onBack} />
@@ -298,6 +395,8 @@ export function KanaWritingPracticeScreen({
           showKanaInfo={isTraceMode}
         />
 
+        <StrokeOrderHint compact={height < 760} template={writingTemplate} />
+
         <View style={styles.canvasArea}>
           <DrawingCanvas
             guideCharacter={activeCharacter.kana}
@@ -307,6 +406,15 @@ export function KanaWritingPracticeScreen({
             onChangeStrokes={handleChangeStrokes}
           />
         </View>
+
+        {feedback ? (
+          <WritingFeedback
+            category={feedback.category}
+            message={feedback.message}
+            mascotImage={feedbackMascotImage}
+            singraMessage={feedback.singraMessage}
+          />
+        ) : null}
 
       </View>
     </AppScreen>
@@ -396,6 +504,65 @@ function ClearIconButton({ label, onPress }: ClearIconButtonProps) {
   );
 }
 
+type StrokeOrderHintProps = {
+  compact: boolean;
+  template?: WritingTemplate;
+};
+
+function StrokeOrderHint({ compact, template }: StrokeOrderHintProps) {
+  if (!template) {
+    return (
+      <View style={[styles.strokeHint, compact ? styles.strokeHintCompact : null]}>
+        <Text style={[styles.strokeHintText, compact ? styles.strokeHintTextCompact : null]}>
+          Traza el kana
+        </Text>
+      </View>
+    );
+  }
+
+
+  return (
+    <View style={[styles.strokeHint, compact ? styles.strokeHintCompact : null]}>
+      <Text style={[styles.strokeHintText, compact ? styles.strokeHintTextCompact : null]}>
+        Orden
+      </Text>
+      <View style={styles.strokeDots}>
+        {template.strokes.map((stroke) => (
+          <View key={`${template.kana}-stroke-${stroke.order}`} style={styles.strokeDot}>
+            <Text style={styles.strokeDotText}>{stroke.order}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+type WritingFeedbackProps = {
+  category: RelaxedWritingEvaluation['category'];
+  mascotImage?: ImageSourcePropType;
+  message: string;
+  singraMessage: string;
+};
+
+function WritingFeedback({ category, mascotImage, message, singraMessage }: WritingFeedbackProps) {
+  return (
+    <View style={[styles.feedbackCard, styles[`feedbackCard_${category}`]]}>
+      <View style={styles.feedbackParticles}>
+        <Text style={styles.feedbackParticle}>*</Text>
+        <Text style={styles.feedbackParticle}>sakura</Text>
+        <Text style={styles.feedbackParticle}>*</Text>
+      </View>
+      {mascotImage ? (
+        <Image resizeMode="contain" source={mascotImage} style={styles.feedbackMascot} />
+      ) : null}
+      <View style={styles.feedbackCopy}>
+        <Text style={styles.feedbackMessage}>{getFeedbackDisplay(message, category)}</Text>
+        <Text style={styles.feedbackSingra}>{singraMessage}</Text>
+      </View>
+    </View>
+  );
+}
+
 type ReviewMascotPanelProps = {
   compact: boolean;
   imageSource?: ImageSourcePropType;
@@ -423,7 +590,7 @@ export function ReviewMascotPanel({ compact, imageSource, isWide, width }: Revie
           resizeMode="contain"
           style={{ height: imageSize, width: imageSize }}
         />
-        <Text style={styles.reviewSparkle}>✦</Text>
+        <Text style={styles.reviewSparkle}>*</Text>
       </View>
       </FloatingView>
     </View>
@@ -512,6 +679,54 @@ const styles = StyleSheet.create({
     right: 16,
     top: 18,
   },
+  solutionContent: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 18,
+    justifyContent: 'center',
+  },
+  solutionCopy: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  solutionTitle: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  solutionSubtitle: {
+    color: colors.mutedText,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  solutionImageWrap: {
+    aspectRatio: 1,
+    maxWidth: 360,
+    position: 'relative',
+    width: '82%',
+  },
+  solutionImage: {
+    height: '100%',
+    width: '100%',
+  },
+  solutionBoardTextWrap: {
+    alignItems: 'center',
+    height: '23%',
+    justifyContent: 'center',
+    left: '30%',
+    position: 'absolute',
+    top: '58%',
+    width: '49%',
+  },
+  solutionKana: {
+    color: colors.ink,
+    fontSize: 70,
+    fontWeight: '900',
+    lineHeight: 82,
+    textAlign: 'center',
+  },
   backButton: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surfaceMuted,
@@ -553,6 +768,108 @@ const styles = StyleSheet.create({
   },
   canvasArea: {
     alignItems: 'center',
+  },
+  strokeHint: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255, 253, 247, 0.76)',
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  strokeHintCompact: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  strokeHintText: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  strokeHintTextCompact: {
+    fontSize: 11,
+  },
+  strokeDots: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  strokeDot: {
+    alignItems: 'center',
+    backgroundColor: '#F8ECEA',
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  strokeDotText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  feedbackCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderColor: colors.borderStrong,
+    borderRadius: 22,
+    borderWidth: 1,
+    bottom: 18,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    position: 'absolute',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 22,
+    elevation: 3,
+  },
+  feedbackCard_perfect: {
+    backgroundColor: '#EEF6EF',
+  },
+  feedbackCard_great: {
+    backgroundColor: '#FFF7DB',
+  },
+  feedbackCard_good: {
+    backgroundColor: '#F8ECEA',
+  },
+  feedbackCard_almost: {
+    backgroundColor: '#EEF4F8',
+  },
+  feedbackParticles: {
+    alignItems: 'center',
+    gap: 1,
+  },
+  feedbackParticle: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '900',
+    opacity: 0.72,
+  },
+  feedbackMascot: {
+    height: 54,
+    width: 54,
+  },
+  feedbackCopy: {
+    gap: 1,
+  },
+  feedbackMessage: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  feedbackSingra: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '900',
   },
   actions: {
     alignItems: 'center',
@@ -652,4 +969,18 @@ function getReviewSeriesLabel(series: KanaSeries, language: 'en' | 'es') {
   }
 
   return series.title.replace(/ Series$/u, '');
+}
+
+function getFeedbackDisplay(
+  message: string,
+  category: RelaxedWritingEvaluation['category'],
+) {
+  const marks: Record<RelaxedWritingEvaluation['category'], string> = {
+    almost: '',
+    good: '',
+    great: '',
+    perfect: '',
+  };
+
+  return `${message} ${marks[category]}`;
 }

@@ -61,16 +61,27 @@ export function WritingSequenceReview({
             <View
               key={`user-${result.kana}-${index}`}
               style={[
-                styles.previewItem,
-                compact ? styles.compactPreviewItem : null,
-                { height: itemSize, width: itemSize },
+                styles.userReviewItem,
+                { width: itemSize },
               ]}>
-              <StrokePreview
-                size={previewSize}
-                sourceCanvasSize={sourceCanvasSize}
-                strokes={result.userStrokes}
-                strokeWidth={14}
-              />
+              <View
+                style={[
+                  styles.previewItem,
+                  compact ? styles.compactPreviewItem : null,
+                  { height: itemSize, width: itemSize },
+                ]}>
+                <StrokePreview
+                  size={previewSize}
+                  sourceCanvasSize={sourceCanvasSize}
+                  strokes={result.userStrokes}
+                  strokeWidth={14}
+                />
+              </View>
+              {result.feedbackLabel ? (
+                <Text style={[styles.feedbackLabel, compact ? styles.compactFeedbackLabel : null]}>
+                  {getFeedbackLabel(result.feedbackLabel, result.feedbackCategory)}
+                </Text>
+              ) : null}
             </View>
           ))}
         </View>
@@ -238,6 +249,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: compactPreviewInset,
   },
+  userReviewItem: {
+    alignItems: 'center',
+    gap: 5,
+  },
+  feedbackLabel: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  compactFeedbackLabel: {
+    fontSize: 9,
+  },
   correctKana: {
     backgroundColor: colors.surface,
     borderColor: colors.borderStrong,
@@ -274,3 +298,14 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 });
+
+function getFeedbackLabel(label: string, category?: WritingPracticeResult['feedbackCategory']) {
+  const marks: Record<NonNullable<WritingPracticeResult['feedbackCategory']>, string> = {
+    almost: '🎌',
+    good: '👍',
+    great: '✨',
+    perfect: '🌸',
+  };
+
+  return category ? `${label} ${marks[category]}` : label;
+}
