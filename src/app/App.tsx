@@ -1,17 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
+import { KanaTokenizerService } from '@/src/features/hiragana/application/services/KanaTokenizerService';
+import { CreateVocabularyDraftUseCase } from '@/src/features/hiragana/application/useCases/CreateVocabularyDraftUseCase';
 import { createRandomKanaSeries } from '@/src/features/hiragana/application/useCases/createRandomKanaSeries';
 import { GetKanaSeriesUseCase } from '@/src/features/hiragana/application/useCases/GetKanaSeriesUseCase';
 import { GetVocabularyByKanaUseCase } from '@/src/features/hiragana/application/useCases/GetVocabularyByKanaUseCase';
 import { GetWritingTemplateUseCase } from '@/src/features/hiragana/application/useCases/GetWritingTemplateUseCase';
 import { getPracticeModes } from '@/src/features/hiragana/application/useCases/getPracticeModes';
 import { getVocabularyPracticeRound } from '@/src/features/hiragana/application/useCases/getVocabularyPracticeRound';
+import { ResolveKanaSeriesUseCase } from '@/src/features/hiragana/application/useCases/ResolveKanaSeriesUseCase';
+import { SearchDictionaryCandidatesUseCase } from '@/src/features/hiragana/application/useCases/SearchDictionaryCandidatesUseCase';
+import { TokenizeKanaUseCase } from '@/src/features/hiragana/application/useCases/TokenizeKanaUseCase';
+import type { DictionaryCandidate } from '@/src/features/hiragana/domain/models/DictionaryCandidate';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
+import { createDictionaryRepository } from '@/src/features/hiragana/infrastructure/repositories/createDictionaryRepository';
 import { createKanaCatalogRepository } from '@/src/features/hiragana/infrastructure/repositories/createKanaCatalogRepository';
+import { createVocabularyDraftRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyDraftRepository';
 import { createVocabularyRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyRepository';
+import { LocalSpanishToEnglishDictionaryRepository } from '@/src/features/hiragana/infrastructure/repositories/LocalSpanishToEnglishDictionaryRepository';
 import { LocalWritingTemplateRepository } from '@/src/features/hiragana/infrastructure/repositories/LocalWritingTemplateRepository';
+import { AddVocabularyFlowScreen } from '@/src/features/hiragana/presentation/screens/AddVocabularyFlowScreen';
 import { FlashcardScreen } from '@/src/features/hiragana/presentation/screens/FlashcardScreen';
 import { HiraganaSeriesScreen } from '@/src/features/hiragana/presentation/screens/HiraganaSeriesScreen';
 import { HomeScreen } from '@/src/features/hiragana/presentation/screens/HomeScreen';
@@ -29,6 +39,7 @@ type WritingMode = Extract<PracticeMode, 'trace' | 'memory'>;
 
 type AppRoute =
   | { name: 'home' }
+  | { name: 'addVocabulary' }
   | { name: 'hiraganaSeries' }
   | { name: 'seriesPractice'; seriesId: string }
   | { name: 'practiceModes'; series: KanaSeries }
@@ -43,9 +54,41 @@ export default function SingraKanaApp() {
   const [isLoadingSeries, setIsLoadingSeries] = useState(true);
 
   const kanaCatalogRepository = useMemo(() => createKanaCatalogRepository(), []);
+  const dictionaryRepository = useMemo(() => createDictionaryRepository(), []);
+  const spanishToEnglishDictionaryRepository = useMemo(
+    () => new LocalSpanishToEnglishDictionaryRepository(),
+    [],
+  );
   const vocabularyRepository = useMemo(() => createVocabularyRepository(), []);
+  const vocabularyDraftRepository = useMemo(() => createVocabularyDraftRepository(), []);
   const writingTemplateRepository = useMemo(() => new LocalWritingTemplateRepository(), []);
+  const kanaTokenizerService = useMemo(() => new KanaTokenizerService(), []);
   const practiceModes = useMemo(() => getPracticeModes(), []);
+  const searchDictionaryCandidates = useMemo(() => {
+    const useCase = new SearchDictionaryCandidatesUseCase(
+      dictionaryRepository,
+      spanishToEnglishDictionaryRepository,
+    );
+    return {
+      searchInitial: (query: string) => useCase.searchCombined(query),
+      searchExternal: (query: string, existingCandidates: DictionaryCandidate[]) =>
+        useCase.searchExternal(query).then((newCandidates) =>
+          useCase.combine(existingCandidates, newCandidates),
+        ),
+    };
+  }, [dictionaryRepository, spanishToEnglishDictionaryRepository]);
+  const tokenizeKana = useMemo(() => {
+    const useCase = new TokenizeKanaUseCase(kanaTokenizerService);
+    return (value: string) => useCase.execute(value);
+  }, [kanaTokenizerService]);
+  const resolveKanaSeries = useMemo(() => {
+    const useCase = new ResolveKanaSeriesUseCase(kanaCatalogRepository);
+    return (kana: string) => useCase.execute(kana);
+  }, [kanaCatalogRepository]);
+  const createVocabularyDraft = useMemo(() => {
+    const useCase = new CreateVocabularyDraftUseCase(vocabularyDraftRepository);
+    return useCase.execute.bind(useCase);
+  }, [vocabularyDraftRepository]);
   const loadVocabularyByKana = useMemo(() => {
     const useCase = new GetVocabularyByKanaUseCase(vocabularyRepository);
     return (kana: string) => useCase.execute(kana);
@@ -91,7 +134,21 @@ export default function SingraKanaApp() {
         <MotionStyleSheet />
         <AnimatedRouteContainer routeKey={getRouteKey(route)}>
           {route.name === 'home' ? (
-            <HomeScreen onOpenHiragana={() => setRoute({ name: 'hiraganaSeries' })} />
+            <HomeScreen
+              onOpenAddVocabulary={() => setRoute({ name: 'addVocabulary' })}
+              onOpenHiragana={() => setRoute({ name: 'hiraganaSeries' })}
+            />
+          ) : null}
+
+          {route.name === 'addVocabulary' ? (
+            <AddVocabularyFlowScreen
+              createDraft={createVocabularyDraft}
+              resolveKanaSeries={resolveKanaSeries}
+              searchExternalCandidates={searchDictionaryCandidates.searchExternal}
+              searchInitialCandidates={searchDictionaryCandidates.searchInitial}
+              tokenizeKana={tokenizeKana}
+              onBack={() => setRoute({ name: 'home' })}
+            />
           ) : null}
 
           {route.name === 'hiraganaSeries' ? (

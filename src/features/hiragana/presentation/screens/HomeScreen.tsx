@@ -12,9 +12,10 @@ import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 
 type HomeScreenProps = {
   onOpenHiragana: () => void;
+  onOpenAddVocabulary: () => void;
 };
 
-export function HomeScreen({ onOpenHiragana }: HomeScreenProps) {
+export function HomeScreen({ onOpenAddVocabulary, onOpenHiragana }: HomeScreenProps) {
   const { height, isDesktop, isMobile, isTablet, width } = useResponsiveLayout();
   const { language, setLanguage, t } = useTranslation();
   const singraHomeImage = getMascotImage('singraHome');
@@ -118,6 +119,13 @@ export function HomeScreen({ onOpenHiragana }: HomeScreenProps) {
               disabled
               index={2}
               width={cardWidth}
+            />
+            <SelectableCard
+              title="Agregar palabra"
+              subtitle="Crea un borrador de vocabulario"
+              index={3}
+              width={cardWidth}
+              onPress={onOpenAddVocabulary}
             />
           </View>
         </View>

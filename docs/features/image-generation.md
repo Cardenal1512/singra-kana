@@ -9,7 +9,8 @@
 
 ## Format
 - All generated assets must be exactly 512x512.
-- Images must be exported as transparent WEBP.
+- Final app assets must be stored as transparent WEBP.
+- If the image provider returns PNG, convert it to WEBP before storing.
 - No background should be included unless explicitly requested.
 
 ## Composition
