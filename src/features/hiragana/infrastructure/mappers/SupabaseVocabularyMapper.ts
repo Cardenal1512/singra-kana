@@ -1,9 +1,11 @@
 import type { VocabularyImage } from '@/src/features/hiragana/domain/models/VocabularyImage';
 import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
+import type { VocabularyWritingSystem } from '@/src/features/hiragana/domain/models/WritingSystem';
 
 export type SupabaseVocabularyRow = {
   id: string;
   kana: string;
+  writing_system: VocabularyWritingSystem;
   japanese: string;
   romaji: string[];
   meaning_es: string | null;
@@ -23,7 +25,8 @@ export function mapSupabaseVocabularyRowToDomain(row: SupabaseVocabularyRow): Vo
   return {
     id: row.id,
     kana: row.kana,
-    kanaSystem: 'hiragana',
+    kanaSystem: row.writing_system === 'mixed' ? 'hiragana' : row.writing_system,
+    writingSystem: row.writing_system,
     japanese: row.japanese,
     readingKana: row.japanese,
     romaji: getPrimaryRomaji(row.romaji),

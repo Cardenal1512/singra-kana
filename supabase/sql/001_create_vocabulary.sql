@@ -1,6 +1,7 @@
 create table if not exists public.vocabulary (
   id text primary key,
   kana text not null,
+  writing_system text not null default 'hiragana',
   japanese text not null,
   romaji text[] not null default '{}',
   meaning_es text,
@@ -9,12 +10,14 @@ create table if not exists public.vocabulary (
   category text,
   kana_series text,
   source text not null default 'official' check (source in ('official', 'user')),
+  constraint vocabulary_writing_system_check check (writing_system in ('hiragana', 'katakana', 'kanji', 'mixed')),
   approved boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 alter table public.vocabulary add column if not exists kana text;
 alter table public.vocabulary add column if not exists source text;
+alter table public.vocabulary add column if not exists writing_system text;
 
 do $$
 begin
@@ -57,8 +60,14 @@ update public.vocabulary
 set source = 'official'
 where source is null;
 
+update public.vocabulary
+set writing_system = 'hiragana'
+where writing_system is null;
+
 alter table public.vocabulary alter column source set default 'official';
 alter table public.vocabulary alter column source set not null;
+alter table public.vocabulary alter column writing_system set default 'hiragana';
+alter table public.vocabulary alter column writing_system set not null;
 alter table public.vocabulary alter column romaji set default '{}';
 alter table public.vocabulary alter column romaji set not null;
 alter table public.vocabulary alter column approved set default true;
@@ -78,5 +87,6 @@ begin
 end $$;
 
 create index if not exists vocabulary_approved_idx on public.vocabulary (approved);
+create index if not exists vocabulary_writing_system_approved_idx on public.vocabulary (writing_system, approved);
 create index if not exists vocabulary_kana_idx on public.vocabulary (kana);
 create index if not exists vocabulary_source_idx on public.vocabulary (source);

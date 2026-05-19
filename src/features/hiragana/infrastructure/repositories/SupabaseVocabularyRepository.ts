@@ -10,6 +10,7 @@ import {
 const vocabularyColumns = [
   'id',
   'kana',
+  'writing_system',
   'japanese',
   'romaji',
   'meaning_es',
@@ -52,7 +53,8 @@ export class SupabaseVocabularyRepository implements VocabularyRepository {
     const baseQuery = this.client
       .from('vocabulary')
       .select(vocabularyColumns)
-      .eq('approved', true) as unknown as SupabaseVocabularyQuery;
+      .eq('approved', true)
+      .eq('writing_system', 'hiragana') as unknown as SupabaseVocabularyQuery;
     const query = refineQuery ? refineQuery(baseQuery) : baseQuery;
     const { data, error } = await query.returns<SupabaseVocabularyRow[]>();
 

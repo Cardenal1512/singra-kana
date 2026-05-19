@@ -9,6 +9,7 @@ export function createRandomKanaSeries(series: KanaSeries[]): KanaSeries {
 
   return {
     id: 'random',
+    syllabary: 'hiragana',
     title: 'MODO RANDOM',
     subtitle: '10 random kana',
     representativeKana: '乱',

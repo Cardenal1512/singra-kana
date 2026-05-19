@@ -10,8 +10,9 @@ import {
   type SupabaseKanaSeriesRow,
 } from '@/src/features/hiragana/infrastructure/mappers/SupabaseKanaCatalogMapper';
 
-const seriesColumns = 'id,title,subtitle,representative_kana,display_order,enabled';
-const characterColumns = 'id,series_id,kana,romaji,romaji_aliases,display_order,enabled';
+const currentSyllabary = 'hiragana';
+const seriesColumns = 'id,syllabary,title,subtitle,representative_kana,display_order,enabled';
+const characterColumns = 'id,series_id,syllabary,kana,romaji,romaji_aliases,display_order,enabled';
 
 export class SupabaseKanaCatalogRepository implements KanaCatalogRepository {
   constructor(private readonly client: SupabaseClient) {}
@@ -41,6 +42,7 @@ export class SupabaseKanaCatalogRepository implements KanaCatalogRepository {
       .from('kana_character')
       .select(characterColumns)
       .eq('enabled', true)
+      .eq('syllabary', currentSyllabary)
       .eq('series_id', seriesId)
       .order('display_order', { ascending: true })
       .returns<SupabaseKanaCharacterRow[]>();
@@ -61,6 +63,7 @@ export class SupabaseKanaCatalogRepository implements KanaCatalogRepository {
       .from('kana_series')
       .select(seriesColumns)
       .eq('enabled', true)
+      .eq('syllabary', currentSyllabary)
       .order('display_order', { ascending: true })
       .returns<SupabaseKanaSeriesRow[]>();
 
@@ -76,6 +79,7 @@ export class SupabaseKanaCatalogRepository implements KanaCatalogRepository {
       .from('kana_character')
       .select(characterColumns)
       .eq('enabled', true)
+      .eq('syllabary', currentSyllabary)
       .order('display_order', { ascending: true })
       .returns<SupabaseKanaCharacterRow[]>();
 
