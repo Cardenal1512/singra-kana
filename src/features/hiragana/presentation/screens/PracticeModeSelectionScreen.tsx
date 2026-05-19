@@ -6,7 +6,6 @@ import type {
   PracticeModeConfig,
   PracticeModeId,
 } from '@/src/features/hiragana/domain/models/PracticeModeConfig';
-import { practiceModes } from '@/src/features/hiragana/infrastructure/data/practiceModes';
 import { PracticeModeCard } from '@/src/features/hiragana/presentation/components/PracticeModeCard';
 import { getMascotImage, getModeImage } from '@/src/shared/assets/imageRegistry';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
@@ -18,6 +17,7 @@ import { softTransition } from '@/src/shared/motion/motionStyles';
 import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 
 type PracticeModeSelectionScreenProps = {
+  practiceModes: PracticeModeConfig[];
   series: KanaSeries;
   seriesOptions?: KanaSeries[];
   onBack: () => void;
@@ -39,6 +39,7 @@ const modeAccentColors: Record<PracticeModeId, string> = {
 };
 
 export function PracticeModeSelectionScreen({
+  practiceModes,
   series,
   seriesOptions,
   onBack,

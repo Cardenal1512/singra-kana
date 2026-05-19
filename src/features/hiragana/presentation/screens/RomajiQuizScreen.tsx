@@ -15,10 +15,8 @@ import {
 
 import { checkRomajiAnswer } from '@/src/features/hiragana/application/useCases/checkRomajiAnswer';
 import type { KanaCharacter } from '@/src/features/hiragana/domain/models/KanaCharacter';
-import type { KanaExample } from '@/src/features/hiragana/domain/models/KanaExample';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
-import { hiraganaSeries } from '@/src/features/hiragana/infrastructure/data/hiraganaSeries';
-import { kanaExamples } from '@/src/features/hiragana/infrastructure/data/kanaExamples';
+import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
 import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
@@ -27,6 +25,8 @@ import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSy
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
 
 type RomajiQuizScreenProps = {
+  getRemoteImageUrl: (fileName: string) => string | undefined;
+  loadVocabularyByKana: (kana: string) => Promise<VocabularyItem[]>;
   series?: KanaSeries;
   seriesId: string;
   onBack: () => void;
@@ -37,13 +37,15 @@ type RomajiQuizScreenProps = {
 type QuizAttempt = {
   character: KanaCharacter;
   correctAnswer: string;
-  example?: KanaExample;
+  example?: VocabularyItem;
   imageSource?: ImageSourcePropType;
   isCorrect: boolean;
   userAnswer: string;
 };
 
 export function RomajiQuizScreen({
+  getRemoteImageUrl,
+  loadVocabularyByKana,
   series: providedSeries,
   seriesId,
   onBack,
@@ -53,7 +55,7 @@ export function RomajiQuizScreen({
   const { language, t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const series = providedSeries ?? hiraganaSeries.find((item) => item.id === seriesId);
+  const series = providedSeries;
   const initialItems = useMemo(() => series?.characters ?? [], [series]);
   const [quizItems, setQuizItems] = useState<KanaCharacter[]>(initialItems);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -106,18 +108,18 @@ export function RomajiQuizScreen({
   const failures = attempts.filter((attempt) => !attempt.isCorrect);
   const correctCount = attempts.filter((attempt) => attempt.isCorrect).length;
 
-  function checkAnswer() {
+  async function checkAnswer() {
     if (resultAttempt) {
       return;
     }
 
     const result = checkRomajiAnswer(currentCharacter, answer);
-    const example = getQuizExample(currentCharacter.kana);
+    const example = (await loadVocabularyByKana(currentCharacter.kana))[0];
     const attempt: QuizAttempt = {
       character: currentCharacter,
       correctAnswer: result.expectedAnswers[0],
       example,
-      imageSource: getVocabularyImage(example?.imageKey),
+      imageSource: resolveVocabularyImage(example, getRemoteImageUrl),
       isCorrect: result.isCorrect,
       userAnswer: answer.trim(),
     };
@@ -280,8 +282,8 @@ function QuizResultScreen({ attempt, language, nextLabel, onNext }: QuizResultSc
           <Text style={styles.resultWord}>
             {language === 'es' ? `como ${wordLabel}` : `as in ${wordLabel}`}
           </Text>
-          {attempt.example?.word ? (
-            <Text style={styles.resultKanaWord}>{attempt.example.word}</Text>
+          {attempt.example?.japanese ? (
+            <Text style={styles.resultKanaWord}>{attempt.example.japanese}</Text>
           ) : null}
           {meaning ? <Text style={styles.resultMeaning}>{meaning}</Text> : null}
 
@@ -412,7 +414,7 @@ function MissItem({ attempt, language }: { attempt: QuizAttempt; language: 'en' 
         <Text style={styles.missKana}>{attempt.character.kana}</Text>
         <Text style={styles.missWord}>
           {wordLabel}
-          {attempt.example?.word ? ` - ${attempt.example.word}` : ''}
+          {attempt.example?.japanese ? ` - ${attempt.example.japanese}` : ''}
         </Text>
         <Text style={styles.missAnswers}>
           {language === 'es' ? 'Tu respuesta' : 'Your answer'}: {attempt.userAnswer || '...'} -{' '}
@@ -442,8 +444,39 @@ function QuizHeader({ backLabel, title, subtitle, onBack }: QuizHeaderProps) {
   );
 }
 
-function getQuizExample(kana: string) {
-  return kanaExamples.find((example) => example.kana === kana);
+function resolveVocabularyImage(
+  item: VocabularyItem | undefined,
+  getRemoteImageUrl: (fileName: string) => string | undefined,
+): ImageSourcePropType | undefined {
+  const image = item?.images[0];
+
+  if (!image) {
+    return undefined;
+  }
+
+  if (image.imageUrl) {
+    return { uri: image.imageUrl };
+  }
+
+  const fileName = getVocabularyImageFileName(image.imagePath ?? image.localAssetKey);
+  const remoteUrl = fileName ? getRemoteImageUrl(fileName) : undefined;
+
+  return remoteUrl ? { uri: remoteUrl } : getVocabularyImage(image.localAssetKey);
+}
+
+function getVocabularyImageFileName(imageKeyOrPath?: string) {
+  if (!imageKeyOrPath) {
+    return undefined;
+  }
+
+  const normalizedPath = imageKeyOrPath.replaceAll('\\', '/');
+  const fileName = normalizedPath.split('/').filter(Boolean).pop();
+
+  if (!fileName) {
+    return undefined;
+  }
+
+  return fileName.includes('.') ? fileName : `${fileName}.webp`;
 }
 
 const styles = StyleSheet.create({

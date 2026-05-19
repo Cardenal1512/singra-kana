@@ -10,20 +10,17 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 
-import { getKanaExamples } from '@/src/features/hiragana/application/useCases/getKanaExamples';
 import {
   evaluateRelaxedWriting,
   type RelaxedWritingEvaluation,
 } from '@/src/features/hiragana/application/useCases/evaluateRelaxedWriting';
-import type { KanaExample } from '@/src/features/hiragana/domain/models/KanaExample';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
 import type { StrokePoint } from '@/src/features/hiragana/domain/models/StrokePoint';
+import type { VocabularyImage } from '@/src/features/hiragana/domain/models/VocabularyImage';
+import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
 import type { WritingTemplate } from '@/src/features/hiragana/domain/models/WritingTemplate';
 import type { WritingPracticeResult } from '@/src/features/hiragana/domain/models/WritingPracticeResult';
-import { hiraganaSeries } from '@/src/features/hiragana/infrastructure/data/hiraganaSeries';
-import { hiraganaWritingTemplates } from '@/src/features/hiragana/infrastructure/data/hiraganaWritingTemplates';
-import { StaticKanaExampleRepository } from '@/src/features/hiragana/infrastructure/repositories/StaticKanaExampleRepository';
 import {
   DrawingCanvas,
   type CanvasSize,
@@ -41,7 +38,10 @@ import { FloatingView } from '@/src/shared/motion/FloatingView';
 
 type KanaWritingPracticeScreenProps = {
   getRemoteImageUrl: (fileName: string) => string | undefined;
+  loadWritingTemplate: (kana: string) => Promise<WritingTemplate | undefined>;
+  loadVocabularyByKana: (kana: string) => Promise<VocabularyItem[]>;
   series?: KanaSeries;
+  seriesOptions: KanaSeries[];
   seriesId: string;
   mode: Extract<PracticeMode, 'trace' | 'memory'>;
   onBack: () => void;
@@ -58,11 +58,13 @@ const screenPadding = 18;
 const maxPracticeWidth = 560;
 const maxReviewWidth = 920;
 const reviewLayoutGap = 8;
-const kanaExampleRepository = new StaticKanaExampleRepository();
 
 export function KanaWritingPracticeScreen({
   getRemoteImageUrl,
+  loadWritingTemplate,
+  loadVocabularyByKana,
   series: providedSeries,
+  seriesOptions,
   seriesId,
   mode,
   onBack,
@@ -71,7 +73,7 @@ export function KanaWritingPracticeScreen({
 }: KanaWritingPracticeScreenProps) {
   const { language, t } = useTranslation();
   const { height, width } = useWindowDimensions();
-  const series = providedSeries ?? hiraganaSeries.find((item) => item.id === seriesId);
+  const series = providedSeries ?? seriesOptions.find((item) => item.id === seriesId);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userStrokes, setUserStrokes] = useState<StrokePoint[][]>([]);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(initialCanvasSize);
@@ -85,7 +87,8 @@ export function KanaWritingPracticeScreen({
   const [practiceCharacters, setPracticeCharacters] = useState<KanaSeries['characters']>(() =>
     series ? shuffleCharacters(series.characters) : [],
   );
-  const [currentExample, setCurrentExample] = useState<KanaExample | undefined>();
+  const [currentExample, setCurrentExample] = useState<VocabularyItem | undefined>();
+  const [writingTemplate, setWritingTemplate] = useState<WritingTemplate | undefined>();
   const [failedRemoteExampleImageKeys, setFailedRemoteExampleImageKeys] = useState<Record<string, true>>({});
   const practiceWidth = Math.min(width - screenPadding * 2, maxPracticeWidth);
   const canvasMaxSize = getCanvasMaxSize(width, height, practiceWidth);
@@ -117,25 +120,30 @@ export function KanaWritingPracticeScreen({
   useEffect(() => {
     let isMounted = true;
 
-    async function loadExample() {
+    async function loadCurrentCharacterData() {
       if (!currentCharacter) {
         setCurrentExample(undefined);
+        setWritingTemplate(undefined);
         return;
       }
 
-      const examples = await getKanaExamples(currentCharacter.kana, kanaExampleRepository);
+      const [examples, template] = await Promise.all([
+        loadVocabularyByKana(currentCharacter.kana),
+        loadWritingTemplate(currentCharacter.kana),
+      ]);
 
       if (isMounted) {
         setCurrentExample(examples[0]);
+        setWritingTemplate(template);
       }
     }
 
-    loadExample();
+    loadCurrentCharacterData();
 
     return () => {
       isMounted = false;
     };
-  }, [currentCharacter]);
+  }, [currentCharacter, loadVocabularyByKana, loadWritingTemplate]);
 
   useEffect(() => {
     return () => {
@@ -162,18 +170,15 @@ export function KanaWritingPracticeScreen({
   const hasUserStrokes = userStrokes.some((stroke) => stroke.length > 0);
   const shouldShowGuide = isTraceMode || helpGuideVisible;
   const exampleImage = resolveVocabularyExampleImage(
-    currentExample?.imageKey,
+    currentExample?.images[0],
     getRemoteImageUrl,
     failedRemoteExampleImageKeys,
   );
-  const mascotImage = getMascotImage(currentExample?.mascotKey);
+  const mascotImage = undefined;
   const reviewMascotImage = getMascotImage('singraSearch');
   const solutionPanelImage = getMascotImage('singraPanel');
   const feedbackMascotImage = getMascotImage('singraGambate') ?? reviewMascotImage;
-  const writingTemplate = hiraganaWritingTemplates.find(
-    (template) => template.kana === activeCharacter.kana,
-  );
-  const nextSeries = getNextSeriesForReview(activeSeries);
+  const nextSeries = getNextSeriesForReview(activeSeries, seriesOptions);
   const nextSeriesLabel = getReviewSeriesLabel(nextSeries, language);
   const activeSeriesLabel = getReviewSeriesLabel(activeSeries, language);
 
@@ -294,10 +299,8 @@ export function KanaWritingPracticeScreen({
 
   function createPracticeResult(evaluation?: RelaxedWritingEvaluation): WritingPracticeResult {
     return {
-      exampleImageKey: currentExample?.imageKey,
-      exampleImageUrl: currentExample?.imageKey
-        ? getRemoteImageUrl(getVocabularyImageFileName(currentExample.imageKey))
-        : undefined,
+      exampleImageKey: getVocabularyImageKey(currentExample?.images[0]),
+      exampleImageUrl: getVocabularyRemoteImageUrl(currentExample?.images[0], getRemoteImageUrl),
       feedbackCategory: evaluation?.category,
       feedbackLabel: evaluation?.message,
       kana: activeCharacter.kana,
@@ -429,7 +432,7 @@ export function KanaWritingPracticeScreen({
           exampleImage={exampleImage}
           language={language}
           mascotImage={mascotImage}
-          onExampleImageError={() => markRemoteExampleImageFailed(currentExample?.imageKey)}
+          onExampleImageError={() => markRemoteExampleImageFailed(getVocabularyImageKey(currentExample?.images[0]))}
           showKanaInfo={isTraceMode}
         />
 
@@ -984,18 +987,18 @@ function shuffleCharacters(characters: KanaSeries['characters']) {
   return shuffledCharacters;
 }
 
-function getNextSeriesForReview(currentSeries: KanaSeries) {
+function getNextSeriesForReview(currentSeries: KanaSeries, seriesOptions: KanaSeries[]) {
   if (currentSeries.id === 'random') {
     return currentSeries;
   }
 
-  const currentIndex = hiraganaSeries.findIndex((item) => item.id === currentSeries.id);
+  const currentIndex = seriesOptions.findIndex((item) => item.id === currentSeries.id);
 
   if (currentIndex === -1) {
-    return hiraganaSeries[0] ?? currentSeries;
+    return seriesOptions[0] ?? currentSeries;
   }
 
-  return hiraganaSeries[(currentIndex + 1) % hiraganaSeries.length];
+  return seriesOptions[(currentIndex + 1) % seriesOptions.length] ?? currentSeries;
 }
 
 function getReviewSeriesLabel(series: KanaSeries, language: 'en' | 'es') {
@@ -1025,22 +1028,55 @@ function getFeedbackDisplay(
 }
 
 function resolveVocabularyExampleImage(
-  imageKey: string | undefined,
+  image: VocabularyImage | undefined,
   getRemoteImageUrl: (fileName: string) => string | undefined,
   failedRemoteImageKeys: Record<string, true>,
 ): ImageSourcePropType | undefined {
-  if (!imageKey) {
+  const imageKey = getVocabularyImageKey(image);
+
+  if (!image || !imageKey) {
     return undefined;
   }
 
   const remoteUrl = failedRemoteImageKeys[imageKey]
     ? undefined
-    : getRemoteImageUrl(getVocabularyImageFileName(imageKey));
+    : getVocabularyRemoteImageUrl(image, getRemoteImageUrl);
 
   return remoteUrl ? { uri: remoteUrl } : getVocabularyImage(imageKey);
 }
 
-function getVocabularyImageFileName(imageKeyOrPath: string) {
+function getVocabularyRemoteImageUrl(
+  image: VocabularyImage | undefined,
+  getRemoteImageUrl: (fileName: string) => string | undefined,
+) {
+  if (!image) {
+    return undefined;
+  }
+
+  if (image.imageUrl) {
+    return image.imageUrl;
+  }
+
+  const fileName = getVocabularyImageFileName(image.imagePath ?? image.localAssetKey);
+
+  return fileName ? getRemoteImageUrl(fileName) : undefined;
+}
+
+function getVocabularyImageKey(image: VocabularyImage | undefined) {
+  if (image?.localAssetKey) {
+    return image.localAssetKey;
+  }
+
+  const fileName = getVocabularyImageFileName(image?.imagePath);
+
+  return fileName?.replace(/\.webp$/u, '');
+}
+
+function getVocabularyImageFileName(imageKeyOrPath?: string) {
+  if (!imageKeyOrPath) {
+    return undefined;
+  }
+
   const normalizedPath = imageKeyOrPath.replaceAll('\\', '/');
   const fileName = normalizedPath.split('/').filter(Boolean).pop() ?? imageKeyOrPath;
 

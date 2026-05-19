@@ -7,15 +7,22 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 
-import type { KanaExample } from '@/src/features/hiragana/domain/models/KanaExample';
 import { colors } from '@/src/shared/constants/colors';
 import type { Language } from '@/src/shared/i18n/translations';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
 
+type KanaPracticeExample = {
+  japanese?: string;
+  meaningEn?: string;
+  meaningEs?: string;
+  romaji: string;
+  word?: string;
+};
+
 type KanaPracticeHeaderProps = {
   kana: string;
   romaji: string;
-  example?: KanaExample;
+  example?: KanaPracticeExample;
   language: Language;
   mascotImage?: ImageSourcePropType;
   exampleImage?: ImageSourcePropType;
@@ -60,7 +67,7 @@ export function KanaPracticeHeader({
           {example ? (
             <View style={styles.exampleBlock}>
               <Text style={styles.exampleIntro}>{t.writing.exampleIntro}</Text>
-              <Text style={styles.exampleWord}>{example.word}</Text>
+              <Text style={styles.exampleWord}>{example.word ?? example.japanese}</Text>
               <Text style={styles.exampleMeta}>{`${example.romaji} · ${meaning}`}</Text>
             </View>
           ) : null}

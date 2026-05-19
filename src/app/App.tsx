@@ -1,13 +1,17 @@
-import { useMemo, useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { createRandomKanaSeries } from '@/src/features/hiragana/application/useCases/createRandomKanaSeries';
+import { GetKanaSeriesUseCase } from '@/src/features/hiragana/application/useCases/GetKanaSeriesUseCase';
+import { GetVocabularyByKanaUseCase } from '@/src/features/hiragana/application/useCases/GetVocabularyByKanaUseCase';
+import { GetWritingTemplateUseCase } from '@/src/features/hiragana/application/useCases/GetWritingTemplateUseCase';
+import { getPracticeModes } from '@/src/features/hiragana/application/useCases/getPracticeModes';
 import { getVocabularyPracticeRound } from '@/src/features/hiragana/application/useCases/getVocabularyPracticeRound';
-import { getHiraganaSeries } from '@/src/features/hiragana/application/useCases/getHiraganaSeries';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
-import { createLocalHiraganaRepository } from '@/src/features/hiragana/infrastructure/repositories/localHiraganaRepository';
+import { createKanaCatalogRepository } from '@/src/features/hiragana/infrastructure/repositories/createKanaCatalogRepository';
 import { createVocabularyRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyRepository';
+import { LocalWritingTemplateRepository } from '@/src/features/hiragana/infrastructure/repositories/LocalWritingTemplateRepository';
 import { FlashcardScreen } from '@/src/features/hiragana/presentation/screens/FlashcardScreen';
 import { HiraganaSeriesScreen } from '@/src/features/hiragana/presentation/screens/HiraganaSeriesScreen';
 import { HomeScreen } from '@/src/features/hiragana/presentation/screens/HomeScreen';
@@ -35,15 +39,51 @@ type AppRoute =
 
 export default function SingraKanaApp() {
   const [route, setRoute] = useState<AppRoute>({ name: 'home' });
+  const [kanaSeries, setKanaSeries] = useState<KanaSeries[]>([]);
+  const [isLoadingSeries, setIsLoadingSeries] = useState(true);
 
-  const hiraganaSeries = useMemo(() => {
-    const repository = createLocalHiraganaRepository();
-    return getHiraganaSeries(repository);
-  }, []);
+  const kanaCatalogRepository = useMemo(() => createKanaCatalogRepository(), []);
+  const vocabularyRepository = useMemo(() => createVocabularyRepository(), []);
+  const writingTemplateRepository = useMemo(() => new LocalWritingTemplateRepository(), []);
+  const practiceModes = useMemo(() => getPracticeModes(), []);
+  const loadVocabularyByKana = useMemo(() => {
+    const useCase = new GetVocabularyByKanaUseCase(vocabularyRepository);
+    return (kana: string) => useCase.execute(kana);
+  }, [vocabularyRepository]);
   const loadVocabularyPracticeRound = useMemo(() => {
-    const repository = createVocabularyRepository();
-    return (count: number) => getVocabularyPracticeRound(repository, count);
-  }, []);
+    return (count: number) => getVocabularyPracticeRound(vocabularyRepository, count);
+  }, [vocabularyRepository]);
+  const loadWritingTemplate = useMemo(() => {
+    const useCase = new GetWritingTemplateUseCase(writingTemplateRepository);
+    return (kana: string) => useCase.execute(kana);
+  }, [writingTemplateRepository]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const useCase = new GetKanaSeriesUseCase(kanaCatalogRepository);
+
+    async function loadSeries() {
+      setIsLoadingSeries(true);
+
+      try {
+        const availableSeries = await useCase.execute();
+
+        if (isMounted) {
+          setKanaSeries(availableSeries);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSeries(false);
+        }
+      }
+    }
+
+    loadSeries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [kanaCatalogRepository]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,28 +95,33 @@ export default function SingraKanaApp() {
           ) : null}
 
           {route.name === 'hiraganaSeries' ? (
-            <HiraganaSeriesScreen
-              series={hiraganaSeries}
-              onBack={() => setRoute({ name: 'home' })}
-              onOpenVocabulary={() => setRoute({ name: 'vocabularyPractice' })}
-              onSelectRandom={() => {
-                const randomSeries = createRandomKanaSeries(hiraganaSeries);
-                setRoute({ name: 'practiceModes', series: randomSeries });
-              }}
-              onOpenSeriesPractice={() =>
-                setRoute({ name: 'seriesPractice', seriesId: hiraganaSeries[0]?.id ?? 'vowels' })
-              }
-            />
+            isLoadingSeries || kanaSeries.length === 0 ? (
+              <DataStateMessage label={isLoadingSeries ? 'Cargando series...' : 'No hay series disponibles'} />
+            ) : (
+              <HiraganaSeriesScreen
+                series={kanaSeries}
+                onBack={() => setRoute({ name: 'home' })}
+                onOpenVocabulary={() => setRoute({ name: 'vocabularyPractice' })}
+                onSelectRandom={() => {
+                  const randomSeries = createRandomKanaSeries(kanaSeries);
+                  setRoute({ name: 'practiceModes', series: randomSeries });
+                }}
+                onOpenSeriesPractice={() =>
+                  setRoute({ name: 'seriesPractice', seriesId: kanaSeries[0]?.id ?? 'vowels' })
+                }
+              />
+            )
           ) : null}
 
-          {route.name === 'seriesPractice' ? (
+          {route.name === 'seriesPractice' && kanaSeries.length > 0 ? (
             <PracticeModeSelectionScreen
-              series={getSeriesById(route.seriesId, hiraganaSeries)}
-              seriesOptions={hiraganaSeries}
+              practiceModes={practiceModes}
+              series={getSeriesById(route.seriesId, kanaSeries)}
+              seriesOptions={kanaSeries}
               onBack={() => setRoute({ name: 'hiraganaSeries' })}
               onSelectSeries={(seriesId) => setRoute({ name: 'seriesPractice', seriesId })}
               onSelectMode={(mode) => {
-                const selectedSeries = getSeriesById(route.seriesId, hiraganaSeries);
+                const selectedSeries = getSeriesById(route.seriesId, kanaSeries);
 
                 if (mode === 'romajiQuiz') {
                   setRoute({
@@ -104,6 +149,7 @@ export default function SingraKanaApp() {
 
           {route.name === 'practiceModes' ? (
             <PracticeModeSelectionScreen
+              practiceModes={practiceModes}
               series={route.series}
               onBack={() => setRoute({ name: 'hiraganaSeries' })}
               onSelectMode={(mode) => {
@@ -129,13 +175,13 @@ export default function SingraKanaApp() {
               onNextSeries={() =>
                 setRoute({
                   name: 'flashcards',
-                  series: getNextSeries(route.series, hiraganaSeries),
+                  series: getNextSeries(route.series, kanaSeries),
                 })
               }
               onRepeatSeries={() =>
                 setRoute({
                   name: 'flashcards',
-                  series: getRepeatSeries(route.series, hiraganaSeries),
+                  series: getRepeatSeries(route.series, kanaSeries),
                 })
               }
             />
@@ -144,6 +190,9 @@ export default function SingraKanaApp() {
           {route.name === 'writingPractice' ? (
             <KanaWritingPracticeScreen
               getRemoteImageUrl={getVocabularyImageUrl}
+              loadWritingTemplate={loadWritingTemplate}
+              loadVocabularyByKana={loadVocabularyByKana}
+              seriesOptions={kanaSeries}
               mode={route.mode}
               series={route.series}
               seriesId={route.series.id}
@@ -152,7 +201,7 @@ export default function SingraKanaApp() {
                 setRoute({
                   name: 'writingPractice',
                   mode: route.mode,
-                  series: getNextSeries(route.series, hiraganaSeries),
+                  series: getNextSeries(route.series, kanaSeries),
                   fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
@@ -160,7 +209,7 @@ export default function SingraKanaApp() {
                 setRoute({
                   name: 'writingPractice',
                   mode: route.mode,
-                  series: getRepeatSeries(route.series, hiraganaSeries),
+                  series: getRepeatSeries(route.series, kanaSeries),
                   fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
@@ -169,20 +218,22 @@ export default function SingraKanaApp() {
 
           {route.name === 'romajiQuiz' ? (
             <RomajiQuizScreen
+              getRemoteImageUrl={getVocabularyImageUrl}
+              loadVocabularyByKana={loadVocabularyByKana}
               series={route.series}
               seriesId={route.series.id}
               onBack={() => setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice))}
               onNextSeries={() =>
                 setRoute({
                   name: 'romajiQuiz',
-                  series: getNextSeries(route.series, hiraganaSeries),
+                  series: getNextSeries(route.series, kanaSeries),
                   fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
               onRepeatSeries={() =>
                 setRoute({
                   name: 'romajiQuiz',
-                  series: getRepeatSeries(route.series, hiraganaSeries),
+                  series: getRepeatSeries(route.series, kanaSeries),
                   fromSeriesPractice: route.fromSeriesPractice,
                 })
               }
@@ -237,6 +288,10 @@ function getSeriesRouteKey(series: KanaSeries) {
 function getNextSeries(currentSeries: KanaSeries, series: KanaSeries[]) {
   const currentIndex = series.findIndex((item) => item.id === currentSeries.id);
 
+  if (series.length === 0) {
+    return currentSeries;
+  }
+
   if (currentIndex === -1) {
     return createRandomKanaSeries(series);
   }
@@ -245,16 +300,36 @@ function getNextSeries(currentSeries: KanaSeries, series: KanaSeries[]) {
 }
 
 function getRepeatSeries(currentSeries: KanaSeries, series: KanaSeries[]) {
-  if (currentSeries.id === 'random') {
+  if (currentSeries.id === 'random' && series.length > 0) {
     return createRandomKanaSeries(series);
   }
 
   return currentSeries;
 }
 
+function DataStateMessage({ label }: { label: string }) {
+  return (
+    <View style={styles.stateContainer}>
+      <Text style={styles.stateText}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  stateContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  stateText: {
+    color: colors.mutedText,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });

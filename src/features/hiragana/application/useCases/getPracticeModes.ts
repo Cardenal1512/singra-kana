@@ -1,0 +1,60 @@
+import type { PracticeModeConfig } from '@/src/features/hiragana/domain/models/PracticeModeConfig';
+
+const practiceModes: PracticeModeConfig[] = [
+  {
+    id: 'trace',
+    mode: 'trace',
+    titleKey: 'trace',
+    descriptionKey: 'trace',
+    japaneseLabel: '\u306a\u305e\u308a\u66f8\u304d',
+    imageKey: 'trace',
+    enabled: true,
+  },
+  {
+    id: 'memory',
+    mode: 'memory',
+    titleKey: 'memory',
+    descriptionKey: 'memory',
+    japaneseLabel: '\u6697\u8a18\u66f8\u304d',
+    imageKey: 'memory',
+    enabled: true,
+  },
+  {
+    id: 'romaji',
+    mode: 'romajiQuiz',
+    titleKey: 'romaji',
+    descriptionKey: 'romaji',
+    japaneseLabel: '\u30ed\u30fc\u30de\u5b57\u30af\u30a4\u30ba',
+    imageKey: 'romaji',
+    enabled: true,
+  },
+  {
+    id: 'words',
+    mode: 'vocabulary',
+    titleKey: 'words',
+    descriptionKey: 'words',
+    japaneseLabel: '\u3053\u3068\u3070',
+    imageKey: 'words',
+    enabled: true,
+  },
+  {
+    id: 'speed',
+    titleKey: 'speed',
+    descriptionKey: 'speed',
+    japaneseLabel: '\u30b9\u30d4\u30fc\u30c9',
+    imageKey: 'speed',
+    enabled: false,
+  },
+  {
+    id: 'listening',
+    titleKey: 'listening',
+    descriptionKey: 'listening',
+    japaneseLabel: '\u304d\u304d\u3068\u308a',
+    imageKey: 'listening',
+    enabled: false,
+  },
+];
+
+export function getPracticeModes(): PracticeModeConfig[] {
+  return practiceModes;
+}
