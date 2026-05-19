@@ -10,6 +10,7 @@ type WritingSequenceReviewProps = {
   availableWidth: number;
   compact?: boolean;
   correctLabel: string;
+  getRemoteImageUrl: (fileName: string) => string | undefined;
   results: WritingPracticeResult[];
   sourceCanvasSize: CanvasSize;
   title: string;
@@ -30,6 +31,7 @@ export function WritingSequenceReview({
   availableWidth,
   compact = false,
   correctLabel,
+  getRemoteImageUrl,
   results,
   sourceCanvasSize,
   title,
@@ -95,7 +97,7 @@ export function WritingSequenceReview({
         </View>
         <View style={[styles.sequence, { gap, width: sequenceWidth }]}>
           {results.map((result, index) => {
-            const exampleImage = getVocabularyImage(result.exampleImageKey);
+            const exampleImage = resolveResultExampleImage(result, getRemoteImageUrl);
 
             return (
               <View
@@ -131,6 +133,30 @@ export function WritingSequenceReview({
       </View>
     </View>
   );
+}
+
+function resolveResultExampleImage(
+  result: WritingPracticeResult,
+  getRemoteImageUrl: (fileName: string) => string | undefined,
+) {
+  if (result.exampleImageUrl) {
+    return { uri: result.exampleImageUrl };
+  }
+
+  if (!result.exampleImageKey) {
+    return undefined;
+  }
+
+  const remoteUrl = getRemoteImageUrl(getVocabularyImageFileName(result.exampleImageKey));
+
+  return remoteUrl ? { uri: remoteUrl } : getVocabularyImage(result.exampleImageKey);
+}
+
+function getVocabularyImageFileName(imageKeyOrPath: string) {
+  const normalizedPath = imageKeyOrPath.replaceAll('\\', '/');
+  const fileName = normalizedPath.split('/').filter(Boolean).pop() ?? imageKeyOrPath;
+
+  return fileName.includes('.') ? fileName : `${fileName}.webp`;
 }
 
 function getColumnCount(availableWidth: number, itemCount: number) {

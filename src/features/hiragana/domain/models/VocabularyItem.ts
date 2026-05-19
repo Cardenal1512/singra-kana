@@ -1,11 +1,24 @@
-import type { ImageSourcePropType } from 'react-native';
+import type { VocabularyImage } from '@/src/features/hiragana/domain/models/VocabularyImage';
+import type { VocabularySource } from '@/src/features/hiragana/domain/models/VocabularySource';
 
 export type VocabularyItem = {
   id: string;
+  kana: string;
+  kanaSystem: 'hiragana' | 'katakana' | 'kanji';
   japanese: string;
+  readingKana?: string;
   romaji: string;
   meaningEs?: string;
   meaningEn?: string;
-  imageKey?: string;
-  imageSource?: ImageSourcePropType;
+  category?: string;
+  kanaSeries?: string;
+  tags: string[];
+  level?: string;
+  source: VocabularySource;
+  isActive: boolean;
+  isOfficial: boolean;
+  approved: boolean;
+  images: VocabularyImage[];
+  createdAt: string;
+  updatedAt: string;
 };

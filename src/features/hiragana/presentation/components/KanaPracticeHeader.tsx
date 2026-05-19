@@ -19,6 +19,7 @@ type KanaPracticeHeaderProps = {
   language: Language;
   mascotImage?: ImageSourcePropType;
   exampleImage?: ImageSourcePropType;
+  onExampleImageError?: () => void;
   showKanaInfo?: boolean;
 };
 
@@ -29,6 +30,7 @@ export function KanaPracticeHeader({
   language,
   mascotImage,
   exampleImage,
+  onExampleImageError,
   showKanaInfo = true,
 }: KanaPracticeHeaderProps) {
   const { t } = useTranslation();
@@ -74,6 +76,7 @@ export function KanaPracticeHeader({
                   { height: exampleImageSize, width: exampleImageSize },
                 ]}>
                 <Image
+                  onError={onExampleImageError}
                   source={exampleImage}
                   style={styles.exampleImage}
                   resizeMode="contain"

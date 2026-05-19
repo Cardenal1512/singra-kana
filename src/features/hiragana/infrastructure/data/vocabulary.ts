@@ -1,15 +1,15 @@
 import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
+import type { VocabularyImage } from '@/src/features/hiragana/domain/models/VocabularyImage';
 import { kanaExamples } from '@/src/features/hiragana/infrastructure/data/kanaExamples';
-import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
+import {
+  kanaExampleToVocabularyImage,
+  kanaExampleToVocabularyItem,
+} from '@/src/features/hiragana/infrastructure/mappers/vocabularyMapper';
 
 export const hiraganaVocabulary: VocabularyItem[] = kanaExamples
-  .map((example) => ({
-    id: example.id,
-    japanese: example.word,
-    romaji: example.romaji,
-    meaningEs: example.meaningEs,
-    meaningEn: example.meaningEn,
-    imageKey: example.imageKey,
-    imageSource: getVocabularyImage(example.imageKey),
-  }))
-  .filter((item) => item.imageSource);
+  .map(kanaExampleToVocabularyItem)
+  .filter((item) => item.isActive);
+
+export const hiraganaVocabularyImages: VocabularyImage[] = kanaExamples
+  .map(kanaExampleToVocabularyImage)
+  .filter((image): image is VocabularyImage => Boolean(image));

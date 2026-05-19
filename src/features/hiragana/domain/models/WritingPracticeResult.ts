@@ -3,6 +3,7 @@ import type { RelaxedWritingCategory } from '@/src/features/hiragana/domain/mode
 
 export type WritingPracticeResult = {
   exampleImageKey?: string;
+  exampleImageUrl?: string;
   feedbackCategory?: RelaxedWritingCategory;
   feedbackLabel?: string;
   kana: string;

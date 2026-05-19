@@ -40,6 +40,7 @@ import { useTranslation } from '@/src/shared/i18n/useTranslation';
 import { FloatingView } from '@/src/shared/motion/FloatingView';
 
 type KanaWritingPracticeScreenProps = {
+  getRemoteImageUrl: (fileName: string) => string | undefined;
   series?: KanaSeries;
   seriesId: string;
   mode: Extract<PracticeMode, 'trace' | 'memory'>;
@@ -60,6 +61,7 @@ const reviewLayoutGap = 8;
 const kanaExampleRepository = new StaticKanaExampleRepository();
 
 export function KanaWritingPracticeScreen({
+  getRemoteImageUrl,
   series: providedSeries,
   seriesId,
   mode,
@@ -84,6 +86,7 @@ export function KanaWritingPracticeScreen({
     series ? shuffleCharacters(series.characters) : [],
   );
   const [currentExample, setCurrentExample] = useState<KanaExample | undefined>();
+  const [failedRemoteExampleImageKeys, setFailedRemoteExampleImageKeys] = useState<Record<string, true>>({});
   const practiceWidth = Math.min(width - screenPadding * 2, maxPracticeWidth);
   const canvasMaxSize = getCanvasMaxSize(width, height, practiceWidth);
   const reviewWidth = Math.min(width - screenPadding * 2, maxReviewWidth);
@@ -158,7 +161,11 @@ export function KanaWritingPracticeScreen({
   const isTraceMode = mode === 'trace';
   const hasUserStrokes = userStrokes.some((stroke) => stroke.length > 0);
   const shouldShowGuide = isTraceMode || helpGuideVisible;
-  const exampleImage = getVocabularyImage(currentExample?.imageKey);
+  const exampleImage = resolveVocabularyExampleImage(
+    currentExample?.imageKey,
+    getRemoteImageUrl,
+    failedRemoteExampleImageKeys,
+  );
   const mascotImage = getMascotImage(currentExample?.mascotKey);
   const reviewMascotImage = getMascotImage('singraSearch');
   const solutionPanelImage = getMascotImage('singraPanel');
@@ -259,6 +266,17 @@ export function KanaWritingPracticeScreen({
     setUserStrokes(nextStrokes);
   }
 
+  function markRemoteExampleImageFailed(imageKey?: string) {
+    if (!imageKey) {
+      return;
+    }
+
+    setFailedRemoteExampleImageKeys((currentFailedKeys) => ({
+      ...currentFailedKeys,
+      [imageKey]: true,
+    }));
+  }
+
   function commitCurrentResult() {
     const evaluation = evaluateRelaxedWriting({
       canvasSize,
@@ -277,6 +295,9 @@ export function KanaWritingPracticeScreen({
   function createPracticeResult(evaluation?: RelaxedWritingEvaluation): WritingPracticeResult {
     return {
       exampleImageKey: currentExample?.imageKey,
+      exampleImageUrl: currentExample?.imageKey
+        ? getRemoteImageUrl(getVocabularyImageFileName(currentExample.imageKey))
+        : undefined,
       feedbackCategory: evaluation?.category,
       feedbackLabel: evaluation?.message,
       kana: activeCharacter.kana,
@@ -351,6 +372,7 @@ export function KanaWritingPracticeScreen({
               availableWidth={reviewMainWidth}
               compact={isCompactReview}
               correctLabel={t.writing.correct}
+              getRemoteImageUrl={getRemoteImageUrl}
               results={results}
               sourceCanvasSize={canvasSize}
               title={t.writing.finalReviewTitle}
@@ -407,6 +429,7 @@ export function KanaWritingPracticeScreen({
           exampleImage={exampleImage}
           language={language}
           mascotImage={mascotImage}
+          onExampleImageError={() => markRemoteExampleImageFailed(currentExample?.imageKey)}
           showKanaInfo={isTraceMode}
         />
 
@@ -999,6 +1022,29 @@ function getFeedbackDisplay(
   };
 
   return `${message} ${marks[category]}`;
+}
+
+function resolveVocabularyExampleImage(
+  imageKey: string | undefined,
+  getRemoteImageUrl: (fileName: string) => string | undefined,
+  failedRemoteImageKeys: Record<string, true>,
+): ImageSourcePropType | undefined {
+  if (!imageKey) {
+    return undefined;
+  }
+
+  const remoteUrl = failedRemoteImageKeys[imageKey]
+    ? undefined
+    : getRemoteImageUrl(getVocabularyImageFileName(imageKey));
+
+  return remoteUrl ? { uri: remoteUrl } : getVocabularyImage(imageKey);
+}
+
+function getVocabularyImageFileName(imageKeyOrPath: string) {
+  const normalizedPath = imageKeyOrPath.replaceAll('\\', '/');
+  const fileName = normalizedPath.split('/').filter(Boolean).pop() ?? imageKeyOrPath;
+
+  return fileName.includes('.') ? fileName : `${fileName}.webp`;
 }
 
 function getCanvasMaxSize(width: number, height: number, practiceWidth: number) {

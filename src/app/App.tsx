@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 
 import { createRandomKanaSeries } from '@/src/features/hiragana/application/useCases/createRandomKanaSeries';
+import { getVocabularyPracticeRound } from '@/src/features/hiragana/application/useCases/getVocabularyPracticeRound';
 import { getHiraganaSeries } from '@/src/features/hiragana/application/useCases/getHiraganaSeries';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
 import { createLocalHiraganaRepository } from '@/src/features/hiragana/infrastructure/repositories/localHiraganaRepository';
+import { createVocabularyRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyRepository';
 import { FlashcardScreen } from '@/src/features/hiragana/presentation/screens/FlashcardScreen';
 import { HiraganaSeriesScreen } from '@/src/features/hiragana/presentation/screens/HiraganaSeriesScreen';
 import { HomeScreen } from '@/src/features/hiragana/presentation/screens/HomeScreen';
@@ -13,6 +15,7 @@ import { KanaWritingPracticeScreen } from '@/src/features/hiragana/presentation/
 import { PracticeModeSelectionScreen } from '@/src/features/hiragana/presentation/screens/PracticeModeSelectionScreen';
 import { RomajiQuizScreen } from '@/src/features/hiragana/presentation/screens/RomajiQuizScreen';
 import { VocabularyPracticeScreen } from '@/src/features/hiragana/presentation/screens/VocabularyPracticeScreen';
+import { getVocabularyImageUrl } from '@/src/infrastructure/supabase/storage/getVocabularyImageUrl';
 import { colors } from '@/src/shared/constants/colors';
 import { LanguageProvider } from '@/src/shared/i18n/useTranslation';
 import { AnimatedRouteContainer } from '@/src/shared/motion/AnimatedRouteContainer';
@@ -36,6 +39,10 @@ export default function SingraKanaApp() {
   const hiraganaSeries = useMemo(() => {
     const repository = createLocalHiraganaRepository();
     return getHiraganaSeries(repository);
+  }, []);
+  const loadVocabularyPracticeRound = useMemo(() => {
+    const repository = createVocabularyRepository();
+    return (count: number) => getVocabularyPracticeRound(repository, count);
   }, []);
 
   return (
@@ -136,6 +143,7 @@ export default function SingraKanaApp() {
 
           {route.name === 'writingPractice' ? (
             <KanaWritingPracticeScreen
+              getRemoteImageUrl={getVocabularyImageUrl}
               mode={route.mode}
               series={route.series}
               seriesId={route.series.id}
@@ -182,7 +190,11 @@ export default function SingraKanaApp() {
           ) : null}
 
           {route.name === 'vocabularyPractice' ? (
-            <VocabularyPracticeScreen onBack={() => setRoute({ name: 'hiraganaSeries' })} />
+            <VocabularyPracticeScreen
+              getRemoteImageUrl={getVocabularyImageUrl}
+              loadPracticeRound={loadVocabularyPracticeRound}
+              onBack={() => setRoute({ name: 'hiraganaSeries' })}
+            />
           ) : null}
         </AnimatedRouteContainer>
       </LanguageProvider>

@@ -10,13 +10,20 @@ import {
   Text,
   TextInput,
   View,
+  type ImageStyle,
+  type ImageSourcePropType,
+  type StyleProp,
 } from 'react-native';
 
 import { checkVocabularyAnswer } from '@/src/features/hiragana/application/useCases/checkVocabularyAnswer';
+import type {
+  VocabularyImage,
+  VocabularyItemWithImages,
+} from '@/src/features/hiragana/domain/models/VocabularyImage';
 import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
-import { hiraganaVocabulary } from '@/src/features/hiragana/infrastructure/data/vocabulary';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
+import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
@@ -25,32 +32,45 @@ import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMo
 import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 
 type VocabularyPracticeScreenProps = {
+  getRemoteImageUrl: (fileName: string) => string | undefined;
+  loadPracticeRound: (count: number) => Promise<VocabularyItemWithImages[]>;
   onBack: () => void;
+};
+
+type VocabularyPracticeItem = VocabularyItem & {
+  localImageSource?: ImageSourcePropType;
+  remoteImageUrl?: string;
 };
 
 type RoundStep = 'setup' | 'question' | 'result' | 'summary';
 
 type VocabularyAttempt = {
-  item: VocabularyItem;
+  item: VocabularyPracticeItem;
   isCorrect: boolean;
   userAnswer: string;
 };
 
 const countOptions = [5, 10, 20] as const;
 
-export function VocabularyPracticeScreen({ onBack }: VocabularyPracticeScreenProps) {
+export function VocabularyPracticeScreen({
+  getRemoteImageUrl,
+  loadPracticeRound,
+  onBack,
+}: VocabularyPracticeScreenProps) {
   const { language, t } = useTranslation();
   const { isMobile, width } = useResponsiveLayout();
   const inputRef = useRef<TextInput>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [step, setStep] = useState<RoundStep>('setup');
   const [selectedCount, setSelectedCount] = useState<number>(5);
-  const [roundItems, setRoundItems] = useState<VocabularyItem[]>([]);
+  const [roundItems, setRoundItems] = useState<VocabularyPracticeItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [attempts, setAttempts] = useState<VocabularyAttempt[]>([]);
   const [resultAttempt, setResultAttempt] = useState<VocabularyAttempt | undefined>();
   const [cameFromFailures, setCameFromFailures] = useState(false);
+  const [isLoadingRound, setIsLoadingRound] = useState(false);
+  const [failedRemoteImageIds, setFailedRemoteImageIds] = useState<Record<string, true>>({});
   const contentWidth = Math.min(width - 28, isMobile ? 420 : 680);
   const currentItem = roundItems[currentIndex];
   const failures = attempts.filter((attempt) => !attempt.isCorrect);
@@ -69,8 +89,22 @@ export function VocabularyPracticeScreen({ onBack }: VocabularyPracticeScreenPro
     return () => clearResultTimer();
   }, []);
 
-  function startRandomRound(count = selectedCount) {
-    startRound(sampleVocabulary(hiraganaVocabulary, count), count, false);
+  async function startRandomRound(count = selectedCount) {
+    if (isLoadingRound) {
+      return;
+    }
+
+    setIsLoadingRound(true);
+
+    try {
+      startRound(
+        await getPresentationPracticeRound(loadPracticeRound, getRemoteImageUrl, count),
+        count,
+        false,
+      );
+    } finally {
+      setIsLoadingRound(false);
+    }
   }
 
   function startFailureRound() {
@@ -85,7 +119,7 @@ export function VocabularyPracticeScreen({ onBack }: VocabularyPracticeScreenPro
     );
   }
 
-  function startRound(items: VocabularyItem[], count: number, fromFailures: boolean) {
+  function startRound(items: VocabularyPracticeItem[], count: number, fromFailures: boolean) {
     clearResultTimer();
     setSelectedCount(count);
     setRoundItems(items);
@@ -94,7 +128,15 @@ export function VocabularyPracticeScreen({ onBack }: VocabularyPracticeScreenPro
     setAttempts([]);
     setResultAttempt(undefined);
     setCameFromFailures(fromFailures);
+    setFailedRemoteImageIds({});
     setStep('question');
+  }
+
+  function markRemoteImageFailed(itemId: string) {
+    setFailedRemoteImageIds((currentFailedIds) => ({
+      ...currentFailedIds,
+      [itemId]: true,
+    }));
   }
 
   function submitAnswer() {
@@ -173,7 +215,15 @@ export function VocabularyPracticeScreen({ onBack }: VocabularyPracticeScreenPro
           </View>
 
           <AppButton
-            label={language === 'es' ? 'Empezar' : 'Start'}
+            label={
+              isLoadingRound
+                ? language === 'es'
+                  ? 'Preparando...'
+                  : 'Preparing...'
+                : language === 'es'
+                  ? 'Empezar'
+                  : 'Start'
+            }
             onPress={() => startRandomRound(selectedCount)}
           />
         </View>
@@ -237,9 +287,12 @@ export function VocabularyPracticeScreen({ onBack }: VocabularyPracticeScreenPro
         </View>
 
         <View style={styles.imageCard}>
-          {currentItem.imageSource ? (
-            <Image resizeMode="contain" source={currentItem.imageSource} style={styles.heroImage} />
-          ) : null}
+          <VocabularyImageView
+            failedRemoteImageIds={failedRemoteImageIds}
+            imageStyle={styles.heroImage}
+            item={currentItem}
+            onRemoteError={markRemoteImageFailed}
+          />
         </View>
 
         <View style={styles.answerPanel}>
@@ -441,9 +494,13 @@ function FailureItem({
 }) {
   return (
     <View style={styles.failureItem}>
-      {attempt.item.imageSource ? (
+      {attempt.item.localImageSource ? (
         <View style={styles.failureImageFrame}>
-          <Image resizeMode="contain" source={attempt.item.imageSource} style={styles.failureImage} />
+          <Image
+            resizeMode="contain"
+            source={attempt.item.localImageSource}
+            style={styles.failureImage}
+          />
         </View>
       ) : null}
       <View style={styles.failureCopy}>
@@ -457,6 +514,34 @@ function FailureItem({
   );
 }
 
+function VocabularyImageView({
+  failedRemoteImageIds,
+  imageStyle,
+  item,
+  onRemoteError,
+}: {
+  failedRemoteImageIds: Record<string, true>;
+  imageStyle: StyleProp<ImageStyle>;
+  item: VocabularyPracticeItem;
+  onRemoteError: (itemId: string) => void;
+}) {
+  const shouldUseRemoteImage = item.remoteImageUrl && !failedRemoteImageIds[item.id];
+  const source = shouldUseRemoteImage ? { uri: item.remoteImageUrl } : item.localImageSource;
+
+  if (!source) {
+    return null;
+  }
+
+  return (
+    <Image
+      onError={shouldUseRemoteImage ? () => onRemoteError(item.id) : undefined}
+      resizeMode="contain"
+      source={source}
+      style={imageStyle}
+    />
+  );
+}
+
 function TopBackButton({ label, onBack }: { label: string; onBack: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
@@ -465,33 +550,54 @@ function TopBackButton({ label, onBack }: { label: string; onBack: () => void })
   );
 }
 
-function sampleVocabulary(source: VocabularyItem[], count: number) {
-  if (source.length === 0) {
-    return [];
-  }
+async function getPresentationPracticeRound(
+  loadPracticeRound: (count: number) => Promise<VocabularyItemWithImages[]>,
+  getRemoteImageUrl: (fileName: string) => string | undefined,
+  count: number,
+): Promise<VocabularyPracticeItem[]> {
+  const roundItems = await loadPracticeRound(count);
 
-  if (count <= source.length) {
-    return shuffle(source).slice(0, count);
-  }
-
-  const items: VocabularyItem[] = [];
-
-  while (items.length < count) {
-    items.push(...shuffle(source).slice(0, count - items.length));
-  }
-
-  return items;
+  return roundItems
+    .map(({ item, images }) => ({
+      ...item,
+      localImageSource: getVocabularyImage(images[0]?.localAssetKey),
+      remoteImageUrl: resolveVocabularyRemoteImageUrl(images[0], getRemoteImageUrl),
+    }))
+    .filter((item) => item.localImageSource || item.remoteImageUrl);
 }
 
-function shuffle<T>(items: T[]) {
-  const shuffled = [...items];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+function resolveVocabularyRemoteImageUrl(
+  image: VocabularyImage | undefined,
+  getRemoteImageUrl: (fileName: string) => string | undefined,
+): string | undefined {
+  if (!image) {
+    return undefined;
   }
 
-  return shuffled;
+  if (image.imageUrl) {
+    return image.imageUrl;
+  }
+
+  const fileName = getVocabularyImageFileName(image);
+
+  return fileName ? getRemoteImageUrl(fileName) : undefined;
+}
+
+function getVocabularyImageFileName(image: VocabularyImage): string | undefined {
+  const imagePath = image.imagePath ?? image.localAssetKey;
+
+  if (!imagePath) {
+    return undefined;
+  }
+
+  const normalizedPath = imagePath.replaceAll('\\', '/');
+  const fileName = normalizedPath.split('/').filter(Boolean).pop();
+
+  if (!fileName) {
+    return undefined;
+  }
+
+  return fileName.includes('.') ? fileName : `${fileName}.webp`;
 }
 
 const styles = StyleSheet.create({
