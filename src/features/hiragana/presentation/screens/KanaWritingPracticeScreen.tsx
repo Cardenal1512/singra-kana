@@ -1006,11 +1006,15 @@ function getReviewSeriesLabel(series: KanaSeries, language: 'en' | 'es') {
     return language === 'es' ? 'random' : 'random';
   }
 
-  if (series.id === 'vowels') {
+  if (getSeriesBaseId(series.id) === 'vowels') {
     return language === 'es' ? 'Vocales' : 'Vowels';
   }
 
   return series.title.replace(/ Series$/u, '');
+}
+
+function getSeriesBaseId(seriesId: string) {
+  return seriesId.replace(/^(hiragana|katakana|kanji)-/u, '');
 }
 
 function getFeedbackDisplay(

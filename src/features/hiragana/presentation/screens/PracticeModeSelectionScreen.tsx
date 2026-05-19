@@ -56,7 +56,7 @@ export function PracticeModeSelectionScreen({
   const title = formatTranslation(t.practiceModes.screenTitleSeries, { series: seriesLabel });
   const kanaRows = chunkKanaRows(
     series.characters.map((character) => character.kana),
-    series.id === 'dakuten' ? 10 : Number.POSITIVE_INFINITY,
+    getSeriesBaseId(series.id) === 'dakuten' ? 10 : Number.POSITIVE_INFINITY,
   );
   const singraImage = getMascotImage('singraGambate') ?? getMascotImage('singraHome');
   const showHeaderMascot = !isMobile && contentWidth >= 700;
@@ -115,7 +115,7 @@ export function PracticeModeSelectionScreen({
                     key={`${series.id}-kana-row-${index}`}
                     style={[
                       styles.kanaLine,
-                      series.id === 'dakuten' ? styles.kanaLineDense : null,
+                      getSeriesBaseId(series.id) === 'dakuten' ? styles.kanaLineDense : null,
                       isMobile ? styles.kanaLineMobile : null,
                     ]}>
                     {kanaRow.join(' ')}
@@ -222,7 +222,7 @@ function getColumnCount(width: number) {
 }
 
 function getSeriesLabel(series: KanaSeries, language: 'en' | 'es') {
-  if (series.id === 'vowels') {
+  if (getSeriesBaseId(series.id) === 'vowels') {
     return language === 'es' ? 'Vocales' : 'Vowels';
   }
 
@@ -230,15 +230,17 @@ function getSeriesLabel(series: KanaSeries, language: 'en' | 'es') {
 }
 
 function getSeriesShortLabel(series: KanaSeries, language: 'en' | 'es') {
-  if (series.id === 'vowels') {
+  const seriesId = getSeriesBaseId(series.id);
+
+  if (seriesId === 'vowels') {
     return 'A';
   }
 
-  if (series.id === 'dakuten') {
+  if (seriesId === 'dakuten') {
     return '゛';
   }
 
-  if (series.id === 'handakuten') {
+  if (seriesId === 'handakuten') {
     return '゜';
   }
 
@@ -261,7 +263,11 @@ function getSeriesJapaneseLabel(series: KanaSeries) {
     handakuten: 'ぱ行',
   };
 
-  return labels[series.id] ?? series.representativeKana;
+  return labels[getSeriesBaseId(series.id)] ?? series.representativeKana;
+}
+
+function getSeriesBaseId(seriesId: string) {
+  return seriesId.replace(/^(hiragana|katakana|kanji)-/u, '');
 }
 
 function formatTranslation(template: string, values: Record<string, string>) {

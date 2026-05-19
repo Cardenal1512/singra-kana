@@ -107,7 +107,7 @@ export default function SingraKanaApp() {
                   setRoute({ name: 'practiceModes', series: randomSeries });
                 }}
                 onOpenSeriesPractice={() =>
-                  setRoute({ name: 'seriesPractice', seriesId: kanaSeries[0]?.id ?? 'vowels' })
+                  setRoute({ name: 'seriesPractice', seriesId: kanaSeries[0]?.id ?? 'hiragana-vowels' })
                 }
               />
             )

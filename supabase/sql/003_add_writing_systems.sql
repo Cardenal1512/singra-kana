@@ -18,7 +18,7 @@ begin
       and conrelid = 'public.kana_series'::regclass
   ) then
     alter table public.kana_series
-      add constraint kana_series_syllabary_check check (syllabary in ('hiragana', 'katakana'));
+      add constraint kana_series_syllabary_check check (syllabary in ('hiragana', 'katakana', 'kanji'));
   end if;
 end $$;
 
@@ -45,7 +45,7 @@ begin
       and conrelid = 'public.kana_character'::regclass
   ) then
     alter table public.kana_character
-      add constraint kana_character_syllabary_check check (syllabary in ('hiragana', 'katakana'));
+      add constraint kana_character_syllabary_check check (syllabary in ('hiragana', 'katakana', 'kanji'));
   end if;
 end $$;
 
