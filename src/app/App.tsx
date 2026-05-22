@@ -9,6 +9,8 @@ import { GetVocabularyByKanaUseCase } from '@/src/features/hiragana/application/
 import { GetWritingTemplateUseCase } from '@/src/features/hiragana/application/useCases/GetWritingTemplateUseCase';
 import { getPracticeModes } from '@/src/features/hiragana/application/useCases/getPracticeModes';
 import { getVocabularyPracticeRound } from '@/src/features/hiragana/application/useCases/getVocabularyPracticeRound';
+import { GenerateVocabularyImagePromptUseCase } from '@/src/features/hiragana/application/useCases/GenerateVocabularyImagePromptUseCase';
+import { GenerateVocabularyImageUseCase } from '@/src/features/hiragana/application/useCases/GenerateVocabularyImageUseCase';
 import { ResolveKanaSeriesUseCase } from '@/src/features/hiragana/application/useCases/ResolveKanaSeriesUseCase';
 import { SearchDictionaryCandidatesUseCase } from '@/src/features/hiragana/application/useCases/SearchDictionaryCandidatesUseCase';
 import { TokenizeKanaUseCase } from '@/src/features/hiragana/application/useCases/TokenizeKanaUseCase';
@@ -16,6 +18,7 @@ import type { DictionaryCandidate } from '@/src/features/hiragana/domain/models/
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
 import { createDictionaryRepository } from '@/src/features/hiragana/infrastructure/repositories/createDictionaryRepository';
+import { createImageGenerationRepository } from '@/src/features/hiragana/infrastructure/repositories/createImageGenerationRepository';
 import { createKanaCatalogRepository } from '@/src/features/hiragana/infrastructure/repositories/createKanaCatalogRepository';
 import { createVocabularyDraftRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyDraftRepository';
 import { createVocabularyRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyRepository';
@@ -29,6 +32,7 @@ import { KanaWritingPracticeScreen } from '@/src/features/hiragana/presentation/
 import { PracticeModeSelectionScreen } from '@/src/features/hiragana/presentation/screens/PracticeModeSelectionScreen';
 import { RomajiQuizScreen } from '@/src/features/hiragana/presentation/screens/RomajiQuizScreen';
 import { VocabularyPracticeScreen } from '@/src/features/hiragana/presentation/screens/VocabularyPracticeScreen';
+import { getGeneratedVocabularyImageUrl } from '@/src/infrastructure/supabase/storage/getGeneratedVocabularyImageUrl';
 import { getVocabularyImageUrl } from '@/src/infrastructure/supabase/storage/getVocabularyImageUrl';
 import { colors } from '@/src/shared/constants/colors';
 import { LanguageProvider } from '@/src/shared/i18n/useTranslation';
@@ -55,6 +59,7 @@ export default function SingraKanaApp() {
 
   const kanaCatalogRepository = useMemo(() => createKanaCatalogRepository(), []);
   const dictionaryRepository = useMemo(() => createDictionaryRepository(), []);
+  const imageGenerationRepository = useMemo(() => createImageGenerationRepository(), []);
   const spanishToEnglishDictionaryRepository = useMemo(
     () => new LocalSpanishToEnglishDictionaryRepository(),
     [],
@@ -89,6 +94,14 @@ export default function SingraKanaApp() {
     const useCase = new CreateVocabularyDraftUseCase(vocabularyDraftRepository);
     return useCase.execute.bind(useCase);
   }, [vocabularyDraftRepository]);
+  const generateVocabularyImagePrompt = useMemo(() => {
+    const useCase = new GenerateVocabularyImagePromptUseCase();
+    return useCase.execute.bind(useCase);
+  }, []);
+  const generateVocabularyImage = useMemo(() => {
+    const useCase = new GenerateVocabularyImageUseCase(imageGenerationRepository);
+    return useCase.execute.bind(useCase);
+  }, [imageGenerationRepository]);
   const loadVocabularyByKana = useMemo(() => {
     const useCase = new GetVocabularyByKanaUseCase(vocabularyRepository);
     return (kana: string) => useCase.execute(kana);
@@ -143,6 +156,9 @@ export default function SingraKanaApp() {
           {route.name === 'addVocabulary' ? (
             <AddVocabularyFlowScreen
               createDraft={createVocabularyDraft}
+              generateImage={generateVocabularyImage}
+              generateImagePrompt={generateVocabularyImagePrompt}
+              getGeneratedImageUrl={getGeneratedVocabularyImageUrl}
               resolveKanaSeries={resolveKanaSeries}
               searchExternalCandidates={searchDictionaryCandidates.searchExternal}
               searchInitialCandidates={searchDictionaryCandidates.searchInitial}

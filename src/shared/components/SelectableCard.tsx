@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/src/shared/constants/colors';
 import { radii, softShadow } from '@/src/shared/constants/visualSystem';
+import { EnterView } from '@/src/shared/motion/EnterView';
 import { getCardEnterStyle, softTransition } from '@/src/shared/motion/motionStyles';
 import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 
@@ -27,6 +28,7 @@ export function SelectableCard({
   const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
+    <EnterView index={index} reducedMotion={prefersReducedMotion} style={width ? { width } : null}>
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
@@ -49,6 +51,7 @@ export function SelectableCard({
       </View>
       {disabled ? <Text style={styles.lockedLabel}>Locked</Text> : null}
     </Pressable>
+    </EnterView>
   );
 }
 

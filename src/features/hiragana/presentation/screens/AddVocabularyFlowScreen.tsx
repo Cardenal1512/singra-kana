@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,8 @@ import {
 } from 'react-native';
 
 import type { DictionaryCandidate } from '@/src/features/hiragana/domain/models/DictionaryCandidate';
+import type { VocabularyImagePromptResult } from '@/src/features/hiragana/application/services/VocabularyImagePromptBuilder';
+import type { GenerateVocabularyImageUseCaseInput } from '@/src/features/hiragana/application/useCases/GenerateVocabularyImageUseCase';
 import type {
   CreateVocabularyDraftInput,
   VocabularyDraft,
@@ -29,6 +32,18 @@ type AddVocabularyFlowScreenProps = {
   tokenizeKana: (value: string) => string[];
   resolveKanaSeries: (kana: string) => Promise<string | undefined>;
   createDraft: (input: CreateVocabularyDraftInput) => Promise<VocabularyDraft>;
+  generateImage: (input: GenerateVocabularyImageUseCaseInput) => Promise<VocabularyDraft>;
+  generateImagePrompt: (input: {
+    japanese: string;
+    reading: string;
+    romaji: string[];
+    meaningEn?: string;
+    meaningEs?: string;
+    selectedKana: string;
+    selectedKanaSeries?: string;
+    writingSystem: VocabularyWritingSystem;
+  }) => VocabularyImagePromptResult;
+  getGeneratedImageUrl: (imagePath: string | undefined) => string | undefined;
   onBack: () => void;
 };
 
@@ -42,6 +57,9 @@ export function AddVocabularyFlowScreen({
   tokenizeKana,
   resolveKanaSeries,
   createDraft,
+  generateImage,
+  generateImagePrompt,
+  getGeneratedImageUrl,
   onBack,
 }: AddVocabularyFlowScreenProps) {
   const { isMobile, width } = useResponsiveLayout();
@@ -56,6 +74,7 @@ export function AddVocabularyFlowScreen({
   const [savedDraft, setSavedDraft] = useState<VocabularyDraft | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExternal, setIsLoadingExternal] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [hasSearchedExternal, setHasSearchedExternal] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
 
@@ -66,6 +85,23 @@ export function AddVocabularyFlowScreen({
 
     return tokenizeKana(selectedCandidate.readingKana || selectedCandidate.japanese);
   }, [selectedCandidate, tokenizeKana]);
+
+  const imagePromptResult = useMemo(() => {
+    if (!selectedCandidate || !mainKana) {
+      return undefined;
+    }
+
+    return generateImagePrompt({
+      japanese: selectedCandidate.japanese,
+      reading: selectedCandidate.readingKana,
+      romaji: selectedCandidate.romaji,
+      meaningEn: selectedCandidate.meaningEn,
+      meaningEs: selectedCandidate.meaningEs,
+      selectedKana: mainKana,
+      selectedKanaSeries: kanaSeries,
+      writingSystem,
+    });
+  }, [generateImagePrompt, kanaSeries, mainKana, selectedCandidate, writingSystem]);
 
   async function handleSearch() {
     setIsLoading(true);
@@ -146,6 +182,10 @@ export function AddVocabularyFlowScreen({
         mainKana,
         kanaSeries,
         writingSystem,
+        imagePrompt: imagePromptResult?.prompt,
+        imagePromptStyleVersion: imagePromptResult?.styleVersion,
+        imagePromptReferenceBucket: imagePromptResult?.referenceImageBucket,
+        imagePromptReferencePath: imagePromptResult?.referenceImagePath,
       });
       setSavedDraft(draft);
       setStep('saved');
@@ -153,6 +193,34 @@ export function AddVocabularyFlowScreen({
       setMessage(`No se pudo guardar el borrador en Supabase. Detalle: ${getErrorMessage(error)}`);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleGenerateImage() {
+    if (!savedDraft) {
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    setMessage(undefined);
+    setSavedDraft({
+      ...savedDraft,
+      imageGenerationStatus: 'generating',
+      imageGenerationError: undefined,
+    });
+
+    try {
+      const updatedDraft = await generateImage({ draft: savedDraft });
+      setSavedDraft(updatedDraft);
+    } catch (error) {
+      setSavedDraft({
+        ...savedDraft,
+        imageGenerationStatus: 'failed',
+        imageGenerationError: getErrorMessage(error),
+      });
+      setMessage(`No se pudo generar la imagen. Detalle: ${getErrorMessage(error)}`);
+    } finally {
+      setIsGeneratingImage(false);
     }
   }
 
@@ -284,6 +352,12 @@ export function AddVocabularyFlowScreen({
                 ))}
               </View>
               <Summary candidate={selectedCandidate} mainKana={mainKana} writingSystem={writingSystem} />
+              {imagePromptResult ? (
+                <ImagePromptPreview
+                  prompt={imagePromptResult.prompt}
+                  reference={`${imagePromptResult.referenceImageBucket}/${imagePromptResult.referenceImagePath}`}
+                />
+              ) : null}
               <FooterActions
                 primaryDisabled={isLoading}
                 primaryLabel={isLoading ? 'Guardando...' : 'Guardar draft'}
@@ -299,6 +373,12 @@ export function AddVocabularyFlowScreen({
               <Text style={styles.sectionTitle}>Draft guardado</Text>
               <Text style={styles.savedKana}>{savedDraft?.japanese}</Text>
               <Text style={styles.bodyText}>La palabra quedó como borrador manual.</Text>
+              <GeneratedImageState
+                draft={savedDraft}
+                getGeneratedImageUrl={getGeneratedImageUrl}
+                isGeneratingImage={isGeneratingImage}
+                onGenerateImage={handleGenerateImage}
+              />
               <AppButton label="Volver al inicio" onPress={onBack} />
             </View>
           ) : null}
@@ -425,6 +505,50 @@ function Summary({
   );
 }
 
+function ImagePromptPreview({ prompt, reference }: { prompt: string; reference: string }) {
+  return (
+    <View style={styles.promptPreview}>
+      <Text style={styles.promptTitle}>Prompt de imagen generado</Text>
+      <Text style={styles.promptReference}>Referencia: {reference}</Text>
+      <Text style={styles.promptText}>{prompt}</Text>
+    </View>
+  );
+}
+
+function GeneratedImageState({
+  draft,
+  getGeneratedImageUrl,
+  isGeneratingImage,
+  onGenerateImage,
+}: {
+  draft?: VocabularyDraft;
+  getGeneratedImageUrl: (imagePath: string | undefined) => string | undefined;
+  isGeneratingImage: boolean;
+  onGenerateImage: () => void;
+}) {
+  const imageUrl = getGeneratedImageUrl(draft?.generatedImagePath);
+  const isGenerated = Boolean(imageUrl);
+
+  return (
+    <View style={styles.generatedImagePanel}>
+      <Text style={styles.promptTitle}>Imagen IA</Text>
+      {isGenerated ? (
+        <Image resizeMode="contain" source={{ uri: imageUrl }} style={styles.generatedImage} />
+      ) : (
+        <Text style={styles.bodyText}>Todavía no hay imagen generada para este draft.</Text>
+      )}
+      {draft?.imageGenerationError ? (
+        <Text style={styles.errorText}>{draft.imageGenerationError}</Text>
+      ) : null}
+      <PrimaryAction
+        disabled={!draft?.imagePrompt || isGeneratingImage}
+        label={isGeneratingImage ? 'Generando...' : isGenerated ? 'Generar otra imagen' : 'Generar imagen'}
+        onPress={onGenerateImage}
+      />
+    </View>
+  );
+}
+
 function getStepLabel(step: FlowStep) {
   const stepLabels: Record<FlowStep, string> = {
     word: '1 de 5',
@@ -440,6 +564,27 @@ function getStepLabel(step: FlowStep) {
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const maybeError = error as {
+      message?: unknown;
+      code?: unknown;
+      details?: unknown;
+      hint?: unknown;
+    };
+    const parts = [
+      maybeError.message ? `message: ${String(maybeError.message)}` : undefined,
+      maybeError.code ? `code: ${String(maybeError.code)}` : undefined,
+      maybeError.details ? `details: ${String(maybeError.details)}` : undefined,
+      maybeError.hint ? `hint: ${String(maybeError.hint)}` : undefined,
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join(' | ');
+    }
+
+    return JSON.stringify(error);
   }
 
   return String(error);
@@ -662,6 +807,49 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: '800',
+  },
+  promptPreview: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    padding: 14,
+  },
+  promptTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  promptText: {
+    color: colors.mutedText,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  promptReference: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  generatedImagePanel: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  generatedImage: {
+    alignSelf: 'center',
+    aspectRatio: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    maxWidth: 260,
+    width: '100%',
   },
   savedKana: {
     color: colors.primary,

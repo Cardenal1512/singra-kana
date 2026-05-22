@@ -6,6 +6,7 @@ import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
+import { EnterView } from '@/src/shared/motion/EnterView';
 import { getCardEnterStyle, softTransition } from '@/src/shared/motion/motionStyles';
 import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
@@ -104,6 +105,7 @@ function HiraganaChoiceCard({
   const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
+    <EnterView index={index} reducedMotion={prefersReducedMotion} style={{ width }}>
     <Pressable
       accessibilityRole="button"
       onHoverIn={() => setHovered(true)}
@@ -124,6 +126,7 @@ function HiraganaChoiceCard({
         <Text style={styles.choiceSubtitle}>{subtitle}</Text>
       </View>
     </Pressable>
+    </EnterView>
   );
 }
 

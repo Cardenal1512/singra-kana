@@ -27,6 +27,13 @@ const vocabularyDraftColumns = [
   'main_kana',
   'kana_series',
   'writing_system',
+  'image_prompt',
+  'image_prompt_style_version',
+  'image_prompt_reference_bucket',
+  'image_prompt_reference_path',
+  'generated_image_path',
+  'image_generation_status',
+  'image_generation_error',
   'status',
   'source',
   'created_at',
@@ -47,7 +54,7 @@ export class SupabaseVocabularyDraftRepository implements VocabularyDraftReposit
       .select(vocabularyDraftColumns) as unknown as SupabaseVocabularyDraftInsertQuery).single();
 
     if (error) {
-      throw error;
+      throw new Error(formatSupabaseError(error));
     }
 
     if (!data) {
@@ -56,4 +63,33 @@ export class SupabaseVocabularyDraftRepository implements VocabularyDraftReposit
 
     return mapSupabaseVocabularyDraftRowToDomain(data);
   }
+}
+
+function formatSupabaseError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const maybeError = error as {
+      message?: unknown;
+      code?: unknown;
+      details?: unknown;
+      hint?: unknown;
+    };
+    const parts = [
+      maybeError.message ? `message: ${String(maybeError.message)}` : undefined,
+      maybeError.code ? `code: ${String(maybeError.code)}` : undefined,
+      maybeError.details ? `details: ${String(maybeError.details)}` : undefined,
+      maybeError.hint ? `hint: ${String(maybeError.hint)}` : undefined,
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join(' | ');
+    }
+
+    return JSON.stringify(error);
+  }
+
+  return String(error);
 }

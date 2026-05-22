@@ -10,6 +10,7 @@ import {
 
 import { colors } from '@/src/shared/constants/colors';
 import { radii } from '@/src/shared/constants/visualSystem';
+import { EnterView } from '@/src/shared/motion/EnterView';
 import { getCardEnterStyle, softTransition } from '@/src/shared/motion/motionStyles';
 import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 
@@ -42,6 +43,7 @@ export function PracticeModeCard({
   const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
+    <EnterView index={index} reducedMotion={prefersReducedMotion} style={{ width }}>
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
@@ -89,6 +91,7 @@ export function PracticeModeCard({
         {disabled ? <Text style={styles.comingSoon}>{comingSoonLabel}</Text> : null}
       </View>
     </Pressable>
+    </EnterView>
   );
 }
 

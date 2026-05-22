@@ -27,6 +27,7 @@ import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
+import { EnterView } from '@/src/shared/motion/EnterView';
 import { getCardEnterStyle, softTransition } from '@/src/shared/motion/motionStyles';
 import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
@@ -336,6 +337,7 @@ function CountCard({
   const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
+    <EnterView index={index} reducedMotion={prefersReducedMotion}>
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
@@ -354,6 +356,7 @@ function CountCard({
       </Text>
       <Text style={styles.countLabel}>{language === 'es' ? 'palabras' : 'words'}</Text>
     </Pressable>
+    </EnterView>
   );
 }
 
