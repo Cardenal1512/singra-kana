@@ -11,13 +11,8 @@ export type VocabularyDraft = {
   mainKana: string;
   kanaSeries?: string;
   writingSystem: VocabularyWritingSystem;
-  imagePrompt?: string;
-  imagePromptStyleVersion?: string;
-  imagePromptReferenceBucket?: string;
-  imagePromptReferencePath?: string;
-  generatedImagePath?: string;
-  imageGenerationStatus?: ImageGenerationStatus;
-  imageGenerationError?: string;
+  category?: string;
+  approvedImagePath: string;
   status: DraftStatus;
   source: 'manual';
   createdAt?: string;
@@ -33,10 +28,14 @@ export type CreateVocabularyDraftInput = {
   mainKana: string;
   kanaSeries?: string;
   writingSystem: VocabularyWritingSystem;
-  imagePrompt?: string;
-  imagePromptStyleVersion?: string;
-  imagePromptReferenceBucket?: string;
-  imagePromptReferencePath?: string;
+  category?: string;
+  manualImage: ManualVocabularyImage;
 };
 
-export type ImageGenerationStatus = 'idle' | 'generating' | 'generated' | 'failed';
+export type ManualVocabularyImage = {
+  fileName: string;
+  height: number;
+  mimeType: string;
+  uri: string;
+  width: number;
+};

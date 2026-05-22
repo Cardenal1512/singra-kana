@@ -27,13 +27,8 @@ const vocabularyDraftColumns = [
   'main_kana',
   'kana_series',
   'writing_system',
-  'image_prompt',
-  'image_prompt_style_version',
-  'image_prompt_reference_bucket',
-  'image_prompt_reference_path',
-  'generated_image_path',
-  'image_generation_status',
-  'image_generation_error',
+  'category',
+  'approved_image_path',
   'status',
   'source',
   'created_at',
@@ -48,9 +43,17 @@ export class SupabaseVocabularyDraftRepository implements VocabularyDraftReposit
       throw new Error('Supabase is not configured');
     }
 
+    const imagePath = await this.uploadManualImage(input);
+
     const { data, error } = await (this.client
       .from('vocabulary_draft')
-      .insert(mapVocabularyDraftInputToSupabaseRow(input))
+      .insert(mapVocabularyDraftInputToSupabaseRow({
+        ...input,
+        manualImage: {
+          ...input.manualImage,
+          fileName: imagePath,
+        },
+      }))
       .select(vocabularyDraftColumns) as unknown as SupabaseVocabularyDraftInsertQuery).single();
 
     if (error) {
@@ -63,6 +66,39 @@ export class SupabaseVocabularyDraftRepository implements VocabularyDraftReposit
 
     return mapSupabaseVocabularyDraftRowToDomain(data);
   }
+
+  private async uploadManualImage(input: CreateVocabularyDraftInput) {
+    if (!this.client) {
+      throw new Error('Supabase is not configured');
+    }
+
+    const response = await fetch(input.manualImage.uri);
+    const imageBlob = await response.blob();
+    const imagePath = createManualVocabularyImagePath(input);
+    const { error } = await this.client.storage
+      .from('vocabulary')
+      .upload(imagePath, imageBlob, {
+        contentType: 'image/webp',
+        upsert: false,
+      });
+
+    if (error) {
+      throw new Error(`No se pudo subir la imagen a Supabase Storage: ${formatSupabaseError(error)}`);
+    }
+
+    return imagePath;
+  }
+}
+
+function createManualVocabularyImagePath(input: CreateVocabularyDraftInput) {
+  const safeJapanese = input.japanese
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\-_]+/giu, '-')
+    .replace(/^-+|-+$/gu, '');
+  const baseName = safeJapanese || 'vocabulary';
+
+  return `manual/${baseName}-${Date.now()}.webp`;
 }
 
 function formatSupabaseError(error: unknown) {

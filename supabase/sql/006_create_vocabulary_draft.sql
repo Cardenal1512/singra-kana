@@ -8,24 +8,16 @@ create table if not exists public.vocabulary_draft (
   main_kana text not null,
   kana_series text,
   writing_system text not null default 'hiragana',
+  category text,
   status text not null default 'draft',
   source text not null default 'manual',
-  image_prompt text,
-  image_prompt_style_version text,
-  image_prompt_reference_bucket text,
-  image_prompt_reference_path text,
-  generated_image_path text,
-  image_generation_status text not null default 'idle',
-  image_generation_error text,
-  approved_image_path text,
+  approved_image_path text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint vocabulary_draft_writing_system_check
     check (writing_system in ('hiragana', 'katakana', 'kanji', 'mixed')),
   constraint vocabulary_draft_status_check
     check (status in ('draft', 'pending_image', 'ready_for_review', 'approved', 'rejected')),
-  constraint vocabulary_draft_image_generation_status_check
-    check (image_generation_status in ('idle', 'generating', 'generated', 'failed')),
   constraint vocabulary_draft_source_check
     check (source in ('manual'))
 );
@@ -39,5 +31,6 @@ create index if not exists vocabulary_draft_writing_system_idx
 create index if not exists vocabulary_draft_kana_series_idx
   on public.vocabulary_draft (kana_series);
 
-create index if not exists vocabulary_draft_image_generation_status_idx
-  on public.vocabulary_draft (image_generation_status);
+alter table public.vocabulary_draft
+  add column if not exists category text,
+  add column if not exists approved_image_path text;
