@@ -14,7 +14,11 @@ import {
   evaluateRelaxedWriting,
   type RelaxedWritingEvaluation,
 } from '@/src/features/hiragana/application/useCases/evaluateRelaxedWriting';
+import type { HandwritingEvaluationResult } from '@/src/features/hiragana/domain/models/HandwritingEvaluation';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
+import type { MemoryHandwritingCollage } from '@/src/features/hiragana/domain/models/MemoryHandwritingCollage';
+import type { MemoryHandwritingDrawing } from '@/src/features/hiragana/domain/models/MemoryHandwritingDrawing';
+import type { MemoryPracticeVariant } from '@/src/features/hiragana/domain/models/MemoryPracticeVariant';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
 import type { StrokePoint } from '@/src/features/hiragana/domain/models/StrokePoint';
 import type { VocabularyImage } from '@/src/features/hiragana/domain/models/VocabularyImage';
@@ -26,6 +30,8 @@ import {
   type CanvasSize,
 } from '@/src/features/hiragana/presentation/components/DrawingCanvas';
 import { KanaPracticeHeader } from '@/src/features/hiragana/presentation/components/KanaPracticeHeader';
+import { MemoryHandwritingCollagePreview } from '@/src/features/hiragana/presentation/components/MemoryHandwritingCollagePreview';
+import { MemoryHandwritingEvaluationSummary } from '@/src/features/hiragana/presentation/components/MemoryHandwritingEvaluationSummary';
 import { ScreenHeader } from '@/src/features/hiragana/presentation/components/ScreenHeader';
 import { WritingSequenceReview } from '@/src/features/hiragana/presentation/components/WritingSequenceReview';
 import { AppScreen } from '@/src/shared/components/AppScreen';
@@ -37,9 +43,22 @@ import { useTranslation } from '@/src/shared/i18n/useTranslation';
 import { FloatingView } from '@/src/shared/motion/FloatingView';
 
 type KanaWritingPracticeScreenProps = {
+  evaluateMemoryHandwriting: (
+    drawings: MemoryHandwritingDrawing[],
+    seriesId: string,
+    collageImageUri?: string,
+    collageImageBase64?: string,
+    collageImageMimeType?: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/svg+xml',
+    collageCanvasSize?: { height: number; width: number },
+    collageStrokeWidth?: number,
+  ) => Promise<HandwritingEvaluationResult | undefined>;
+  generateMemoryHandwritingCollage: (
+    drawings: MemoryHandwritingDrawing[],
+  ) => Promise<MemoryHandwritingCollage | undefined>;
   getRemoteImageUrl: (fileName: string) => string | undefined;
   loadWritingTemplate: (kana: string) => Promise<WritingTemplate | undefined>;
   loadVocabularyByKana: (kana: string) => Promise<VocabularyItem[]>;
+  memoryPracticeVariant?: MemoryPracticeVariant;
   series?: KanaSeries;
   seriesOptions: KanaSeries[];
   seriesId: string;
@@ -60,9 +79,12 @@ const maxReviewWidth = 920;
 const reviewLayoutGap = 8;
 
 export function KanaWritingPracticeScreen({
+  evaluateMemoryHandwriting,
+  generateMemoryHandwritingCollage,
   getRemoteImageUrl,
   loadWritingTemplate,
   loadVocabularyByKana,
+  memoryPracticeVariant = 'without-ai',
   series: providedSeries,
   seriesOptions,
   seriesId,
@@ -78,11 +100,16 @@ export function KanaWritingPracticeScreen({
   const [userStrokes, setUserStrokes] = useState<StrokePoint[][]>([]);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(initialCanvasSize);
   const [completed, setCompleted] = useState(false);
+  const [handwritingEvaluation, setHandwritingEvaluation] = useState<HandwritingEvaluationResult | undefined>();
+  const [isEvaluatingHandwriting, setIsEvaluatingHandwriting] = useState(false);
+  const [handwritingEvaluationError, setHandwritingEvaluationError] = useState<string | undefined>();
+  const [memoryCollage, setMemoryCollage] = useState<MemoryHandwritingCollage | undefined>();
   const [helpGuideVisible, setHelpGuideVisible] = useState(false);
   const [showSingraSolution, setShowSingraSolution] = useState(false);
   const [solutionKana, setSolutionKana] = useState('');
   const [pendingNextIndex, setPendingNextIndex] = useState<number | undefined>();
   const [results, setResults] = useState<WritingPracticeResult[]>([]);
+  const [memoryDrawings, setMemoryDrawings] = useState<MemoryHandwritingDrawing[]>([]);
   const [feedback, setFeedback] = useState<RelaxedWritingEvaluation | undefined>();
   const [practiceCharacters, setPracticeCharacters] = useState<KanaSeries['characters']>(() =>
     series ? shuffleCharacters(series.characters) : [],
@@ -115,6 +142,11 @@ export function KanaWritingPracticeScreen({
     setSolutionKana('');
     setPendingNextIndex(undefined);
     setResults([]);
+    setMemoryDrawings([]);
+    setHandwritingEvaluation(undefined);
+    setIsEvaluatingHandwriting(false);
+    setHandwritingEvaluationError(undefined);
+    setMemoryCollage(undefined);
   }, [selectedSeries]);
 
   useEffect(() => {
@@ -167,6 +199,7 @@ export function KanaWritingPracticeScreen({
   const activeSeries = selectedSeries;
   const activeCharacter = currentCharacter;
   const isTraceMode = mode === 'trace';
+  const shouldUseAiEvaluation = mode === 'memory' && memoryPracticeVariant === 'with-ai';
   const hasUserStrokes = userStrokes.some((stroke) => stroke.length > 0);
   const shouldShowGuide = isTraceMode || helpGuideVisible;
   const exampleImage = resolveVocabularyExampleImage(
@@ -200,7 +233,9 @@ export function KanaWritingPracticeScreen({
     const nextResult = createPracticeResult(evaluation);
     const nextResults = [...results];
     nextResults[currentIndex] = nextResult;
+    const nextMemoryDrawings = saveMemoryDrawing(memoryDrawings);
     setResults(nextResults);
+    setMemoryDrawings(nextMemoryDrawings);
     setFeedback(evaluation);
 
     feedbackTimeoutRef.current = setTimeout(() => {
@@ -220,7 +255,7 @@ export function KanaWritingPracticeScreen({
           setShowSingraSolution(false);
 
           if (nextIndex >= practiceCharacters.length) {
-            setCompleted(true);
+            finishPractice(nextMemoryDrawings);
             return;
           }
 
@@ -232,8 +267,7 @@ export function KanaWritingPracticeScreen({
       }
 
       if (nextIndex >= practiceCharacters.length) {
-        setCompleted(true);
-        setHelpGuideVisible(false);
+        finishPractice(nextMemoryDrawings);
         return;
       }
 
@@ -265,6 +299,11 @@ export function KanaWritingPracticeScreen({
     setSolutionKana('');
     setPendingNextIndex(undefined);
     setResults([]);
+    setMemoryDrawings([]);
+    setHandwritingEvaluation(undefined);
+    setIsEvaluatingHandwriting(false);
+    setHandwritingEvaluationError(undefined);
+    setMemoryCollage(undefined);
   }
 
   function handleChangeStrokes(nextStrokes: StrokePoint[][]) {
@@ -295,6 +334,7 @@ export function KanaWritingPracticeScreen({
       nextResults[currentIndex] = nextResult;
       return nextResults;
     });
+    setMemoryDrawings((currentDrawings) => saveMemoryDrawing(currentDrawings));
   }
 
   function createPracticeResult(evaluation?: RelaxedWritingEvaluation): WritingPracticeResult {
@@ -308,6 +348,94 @@ export function KanaWritingPracticeScreen({
       score: evaluation?.score,
       userStrokes,
     };
+  }
+
+  function saveMemoryDrawing(currentDrawings: MemoryHandwritingDrawing[]) {
+    if (mode !== 'memory') {
+      return currentDrawings;
+    }
+
+    const nextDrawings = [...currentDrawings];
+    nextDrawings[currentIndex] = createMemoryDrawing();
+    return nextDrawings;
+  }
+
+  function createMemoryDrawing(): MemoryHandwritingDrawing {
+    return {
+      id: `${activeSeries.id}-${currentIndex}-${activeCharacter.kana}`,
+      order: currentIndex,
+      expectedKana: activeCharacter.kana,
+      romaji: activeCharacter.romaji,
+      strokes: userStrokes,
+      canvasSize,
+    };
+  }
+
+  function finishPractice(finalDrawings: MemoryHandwritingDrawing[]) {
+    setCompleted(true);
+    setHelpGuideVisible(false);
+
+    console.log('[MEMORY_EVALUATION] Selected mode', {
+      memoryPracticeVariant,
+      mode,
+      shouldUseAiEvaluation,
+    });
+
+    if (!shouldUseAiEvaluation) {
+      return;
+    }
+
+    setHandwritingEvaluation(undefined);
+    setIsEvaluatingHandwriting(true);
+    setHandwritingEvaluationError(undefined);
+    setMemoryCollage(undefined);
+    generateMemoryHandwritingCollage(finalDrawings)
+      .then((collage) => {
+        setMemoryCollage(collage);
+
+        if (collage) {
+          console.log('[MemoryHandwritingCollage]', {
+            height: collage.height,
+            imageBase64Length: collage.imageBase64.length,
+            layout: collage.layout,
+            localUriScheme: collage.localUri.split(':')[0],
+            mimeType: collage.mimeType,
+            strokeWidth: collage.strokeWidth,
+            width: collage.width,
+          });
+        }
+
+        return evaluateMemoryHandwriting(
+          finalDrawings,
+          activeSeries.id,
+          collage?.localUri,
+          collage?.imageBase64,
+          collage?.mimeType,
+          collage ? { height: collage.height, width: collage.width } : undefined,
+          collage?.strokeWidth,
+        );
+      })
+      .then((evaluation) => {
+        setHandwritingEvaluation(evaluation);
+        if (evaluation?.source === 'fallback') {
+          setHandwritingEvaluationError(
+            language === 'es'
+              ? 'AI failed, fallback used'
+              : 'AI failed, fallback used',
+          );
+        }
+      })
+      .catch(() => {
+        setHandwritingEvaluation(undefined);
+        setHandwritingEvaluationError(
+          language === 'es'
+            ? 'Singra no pudo revisar tu escritura esta vez, pero tu práctica se ha guardado.'
+            : 'Singra could not review your writing this time, but your practice was saved.',
+        );
+      })
+      .finally(() => {
+        setIsEvaluatingHandwriting(false);
+      });
   }
 
   if (showSingraSolution) {
@@ -371,16 +499,32 @@ export function KanaWritingPracticeScreen({
         }>
         <View style={[styles.reviewContent, { width: reviewWidth }]}>
           <View style={[styles.reviewMain, { width: reviewMainWidth }]}>
-            <WritingSequenceReview
-              availableWidth={reviewMainWidth}
-              compact={isCompactReview}
-              correctLabel={t.writing.correct}
-              getRemoteImageUrl={getRemoteImageUrl}
-              results={results}
-              sourceCanvasSize={canvasSize}
-              title={t.writing.finalReviewTitle}
-              yourWritingLabel={t.writing.yourWriting}
-            />
+            {shouldUseAiEvaluation ? (
+              <View style={styles.memoryReviewStack}>
+                <MemoryHandwritingEvaluationSummary
+                  errorMessage={handwritingEvaluationError}
+                  evaluation={handwritingEvaluation}
+                  isLoading={isEvaluatingHandwriting}
+                  language={language}
+                />
+                <MemoryHandwritingCollagePreview
+                  availableWidth={reviewMainWidth}
+                  collage={memoryCollage}
+                  language={language}
+                />
+              </View>
+            ) : (
+              <WritingSequenceReview
+                availableWidth={reviewMainWidth}
+                compact={isCompactReview}
+                correctLabel={t.writing.correct}
+                getRemoteImageUrl={getRemoteImageUrl}
+                results={results}
+                sourceCanvasSize={canvasSize}
+                title={t.writing.finalReviewTitle}
+                yourWritingLabel={t.writing.yourWriting}
+              />
+            )}
           </View>
         </View>
       </AppScreen>
@@ -691,6 +835,9 @@ const styles = StyleSheet.create({
   },
   reviewMain: {
     flexShrink: 0,
+  },
+  memoryReviewStack: {
+    gap: 12,
   },
   reviewMascotPanel: {
     alignItems: 'center',

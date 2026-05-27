@@ -4,6 +4,8 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { KanaTokenizerService } from '@/src/features/hiragana/application/services/KanaTokenizerService';
 import { CreateVocabularyDraftUseCase } from '@/src/features/hiragana/application/useCases/CreateVocabularyDraftUseCase';
 import { createRandomKanaSeries } from '@/src/features/hiragana/application/useCases/createRandomKanaSeries';
+import { EvaluateMemoryHandwritingUseCase } from '@/src/features/hiragana/application/useCases/EvaluateMemoryHandwritingUseCase';
+import { GenerateMemoryHandwritingCollageUseCase } from '@/src/features/hiragana/application/useCases/GenerateMemoryHandwritingCollageUseCase';
 import { GetKanaSeriesUseCase } from '@/src/features/hiragana/application/useCases/GetKanaSeriesUseCase';
 import { GetVocabularyByKanaUseCase } from '@/src/features/hiragana/application/useCases/GetVocabularyByKanaUseCase';
 import { GetWritingTemplateUseCase } from '@/src/features/hiragana/application/useCases/GetWritingTemplateUseCase';
@@ -13,7 +15,11 @@ import { ResolveKanaSeriesUseCase } from '@/src/features/hiragana/application/us
 import { SearchDictionaryCandidatesUseCase } from '@/src/features/hiragana/application/useCases/SearchDictionaryCandidatesUseCase';
 import { TokenizeKanaUseCase } from '@/src/features/hiragana/application/useCases/TokenizeKanaUseCase';
 import type { DictionaryCandidate } from '@/src/features/hiragana/domain/models/DictionaryCandidate';
+import type { HandwritingEvaluationResult } from '@/src/features/hiragana/domain/models/HandwritingEvaluation';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
+import type { MemoryHandwritingCollage } from '@/src/features/hiragana/domain/models/MemoryHandwritingCollage';
+import type { MemoryHandwritingDrawing } from '@/src/features/hiragana/domain/models/MemoryHandwritingDrawing';
+import type { MemoryPracticeVariant } from '@/src/features/hiragana/domain/models/MemoryPracticeVariant';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
 import { createDictionaryRepository } from '@/src/features/hiragana/infrastructure/repositories/createDictionaryRepository';
 import { createKanaCatalogRepository } from '@/src/features/hiragana/infrastructure/repositories/createKanaCatalogRepository';
@@ -21,11 +27,14 @@ import { createVocabularyDraftRepository } from '@/src/features/hiragana/infrast
 import { createVocabularyRepository } from '@/src/features/hiragana/infrastructure/repositories/createVocabularyRepository';
 import { LocalSpanishToEnglishDictionaryRepository } from '@/src/features/hiragana/infrastructure/repositories/LocalSpanishToEnglishDictionaryRepository';
 import { LocalWritingTemplateRepository } from '@/src/features/hiragana/infrastructure/repositories/LocalWritingTemplateRepository';
+import { SvgMemoryHandwritingCollageService } from '@/src/features/hiragana/infrastructure/services/SvgMemoryHandwritingCollageService';
+import { createHandwritingEvaluationPort } from '@/src/features/hiragana/infrastructure/services/createHandwritingEvaluationPort';
 import { AddVocabularyFlowScreen } from '@/src/features/hiragana/presentation/screens/AddVocabularyFlowScreen';
 import { FlashcardScreen } from '@/src/features/hiragana/presentation/screens/FlashcardScreen';
 import { HiraganaSeriesScreen } from '@/src/features/hiragana/presentation/screens/HiraganaSeriesScreen';
 import { HomeScreen } from '@/src/features/hiragana/presentation/screens/HomeScreen';
 import { KanaWritingPracticeScreen } from '@/src/features/hiragana/presentation/screens/KanaWritingPracticeScreen';
+import { MemoryPracticeVariantSelectionScreen } from '@/src/features/hiragana/presentation/screens/MemoryPracticeVariantSelectionScreen';
 import { PracticeModeSelectionScreen } from '@/src/features/hiragana/presentation/screens/PracticeModeSelectionScreen';
 import { RomajiQuizScreen } from '@/src/features/hiragana/presentation/screens/RomajiQuizScreen';
 import { VocabularyPracticeScreen } from '@/src/features/hiragana/presentation/screens/VocabularyPracticeScreen';
@@ -44,7 +53,14 @@ type AppRoute =
   | { name: 'seriesPractice'; seriesId: string }
   | { name: 'practiceModes'; series: KanaSeries }
   | { name: 'flashcards'; series: KanaSeries }
-  | { name: 'writingPractice'; mode: WritingMode; series: KanaSeries; fromSeriesPractice?: boolean }
+  | { name: 'memoryPracticeVariant'; series: KanaSeries; fromSeriesPractice?: boolean }
+  | {
+      name: 'writingPractice';
+      mode: WritingMode;
+      series: KanaSeries;
+      fromSeriesPractice?: boolean;
+      memoryPracticeVariant?: MemoryPracticeVariant;
+    }
   | { name: 'romajiQuiz'; series: KanaSeries; fromSeriesPractice?: boolean }
   | { name: 'vocabularyPractice' };
 
@@ -62,6 +78,11 @@ export default function SingraKanaApp() {
   const vocabularyRepository = useMemo(() => createVocabularyRepository(), []);
   const vocabularyDraftRepository = useMemo(() => createVocabularyDraftRepository(), []);
   const writingTemplateRepository = useMemo(() => new LocalWritingTemplateRepository(), []);
+  const handwritingEvaluationPort = useMemo(() => createHandwritingEvaluationPort(), []);
+  const memoryHandwritingCollageService = useMemo(
+    () => new SvgMemoryHandwritingCollageService(),
+    [],
+  );
   const kanaTokenizerService = useMemo(() => new KanaTokenizerService(), []);
   const practiceModes = useMemo(() => getPracticeModes(), []);
   const searchDictionaryCandidates = useMemo(() => {
@@ -100,6 +121,32 @@ export default function SingraKanaApp() {
     const useCase = new GetWritingTemplateUseCase(writingTemplateRepository);
     return (kana: string) => useCase.execute(kana);
   }, [writingTemplateRepository]);
+  const evaluateMemoryHandwriting = useMemo(() => {
+    const useCase = new EvaluateMemoryHandwritingUseCase(handwritingEvaluationPort);
+    return (
+      drawings: MemoryHandwritingDrawing[],
+      seriesId: string,
+      collageImageUri?: string,
+      collageImageBase64?: string,
+      collageImageMimeType?: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/svg+xml',
+      collageCanvasSize?: { height: number; width: number },
+      collageStrokeWidth?: number,
+    ): Promise<HandwritingEvaluationResult | undefined> =>
+      useCase.execute({
+        collageCanvasSize,
+        collageImageBase64,
+        collageImageMimeType,
+        collageImageUri,
+        collageStrokeWidth,
+        drawings,
+        seriesId,
+      });
+  }, [handwritingEvaluationPort]);
+  const generateMemoryHandwritingCollage = useMemo(() => {
+    const useCase = new GenerateMemoryHandwritingCollageUseCase(memoryHandwritingCollageService);
+    return (drawings: MemoryHandwritingDrawing[]): Promise<MemoryHandwritingCollage | undefined> =>
+      useCase.execute(drawings);
+  }, [memoryHandwritingCollageService]);
 
   useEffect(() => {
     let isMounted = true;
@@ -194,6 +241,15 @@ export default function SingraKanaApp() {
                   return;
                 }
 
+                if (mode === 'memory') {
+                  setRoute({
+                    name: 'memoryPracticeVariant',
+                    series: selectedSeries,
+                    fromSeriesPractice: true,
+                  });
+                  return;
+                }
+
                 setRoute({
                   name: 'writingPractice',
                   mode,
@@ -220,8 +276,32 @@ export default function SingraKanaApp() {
                   return;
                 }
 
+                if (mode === 'memory') {
+                  setRoute({
+                    name: 'memoryPracticeVariant',
+                    series: route.series,
+                  });
+                  return;
+                }
+
                 setRoute({ name: 'writingPractice', mode, series: route.series });
               }}
+            />
+          ) : null}
+
+          {route.name === 'memoryPracticeVariant' ? (
+            <MemoryPracticeVariantSelectionScreen
+              series={route.series}
+              onBack={() => setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice))}
+              onSelectVariant={(memoryPracticeVariant) =>
+                setRoute({
+                  name: 'writingPractice',
+                  mode: 'memory',
+                  series: route.series,
+                  fromSeriesPractice: route.fromSeriesPractice,
+                  memoryPracticeVariant,
+                })
+              }
             />
           ) : null}
 
@@ -246,11 +326,14 @@ export default function SingraKanaApp() {
 
           {route.name === 'writingPractice' ? (
             <KanaWritingPracticeScreen
+              evaluateMemoryHandwriting={evaluateMemoryHandwriting}
+              generateMemoryHandwritingCollage={generateMemoryHandwritingCollage}
               getRemoteImageUrl={getVocabularyImageUrl}
               loadWritingTemplate={loadWritingTemplate}
               loadVocabularyByKana={loadVocabularyByKana}
               seriesOptions={kanaSeries}
               mode={route.mode}
+              memoryPracticeVariant={route.memoryPracticeVariant}
               series={route.series}
               seriesId={route.series.id}
               onBack={() => setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice))}
@@ -260,6 +343,7 @@ export default function SingraKanaApp() {
                   mode: route.mode,
                   series: getNextSeries(route.series, kanaSeries),
                   fromSeriesPractice: route.fromSeriesPractice,
+                  memoryPracticeVariant: route.memoryPracticeVariant,
                 })
               }
               onRepeatSeries={() =>
@@ -268,6 +352,7 @@ export default function SingraKanaApp() {
                   mode: route.mode,
                   series: getRepeatSeries(route.series, kanaSeries),
                   fromSeriesPractice: route.fromSeriesPractice,
+                  memoryPracticeVariant: route.memoryPracticeVariant,
                 })
               }
             />
@@ -312,7 +397,11 @@ export default function SingraKanaApp() {
 
 function getRouteKey(route: AppRoute) {
   if (route.name === 'writingPractice') {
-    return `${route.name}-${getSeriesRouteKey(route.series)}-${route.mode}`;
+    return `${route.name}-${getSeriesRouteKey(route.series)}-${route.mode}-${route.memoryPracticeVariant ?? 'default'}`;
+  }
+
+  if (route.name === 'memoryPracticeVariant') {
+    return `${route.name}-${getSeriesRouteKey(route.series)}`;
   }
 
   if ('series' in route) {

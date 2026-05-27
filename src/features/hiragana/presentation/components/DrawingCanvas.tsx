@@ -13,6 +13,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 
 import type { StrokePoint } from '@/src/features/hiragana/domain/models/StrokePoint';
+import { buildStrokeSvgPath } from '@/src/features/hiragana/domain/services/buildStrokeSvgPath';
 import { colors } from '@/src/shared/constants/colors';
 
 export type CanvasSize = {
@@ -31,7 +32,6 @@ type DrawingCanvasProps = {
 };
 
 const strokeWidth = 16;
-const dotRadius = strokeWidth / 2;
 const inkWashStrokeWidth = 22;
 
 export function DrawingCanvas({
@@ -193,48 +193,7 @@ function StrokePath({ stroke }: { stroke: StrokePoint[] }) {
 }
 
 export function buildPath(points: StrokePoint[]): string {
-  if (points.length === 0) {
-    return '';
-  }
-
-  const [firstPoint, ...remainingPoints] = points;
-
-  if (remainingPoints.length === 0) {
-    return [
-      `M ${firstPoint.x} ${firstPoint.y}`,
-      `m -${dotRadius} 0`,
-      `a ${dotRadius} ${dotRadius} 0 1 0 ${strokeWidth} 0`,
-      `a ${dotRadius} ${dotRadius} 0 1 0 -${strokeWidth} 0`,
-    ].join(' ');
-  }
-
-  if (points.length === 2) {
-    const [secondPoint] = remainingPoints;
-    return `M ${firstPoint.x} ${firstPoint.y} L ${secondPoint.x} ${secondPoint.y}`;
-  }
-
-  return buildSmoothPath(points);
-}
-
-function buildSmoothPath(points: StrokePoint[]) {
-  const [firstPoint] = points;
-  const commands = [`M ${firstPoint.x} ${firstPoint.y}`];
-
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const currentPoint = points[index];
-    const nextPoint = points[index + 1];
-    const midPoint = {
-      x: (currentPoint.x + nextPoint.x) / 2,
-      y: (currentPoint.y + nextPoint.y) / 2,
-    };
-
-    commands.push(`Q ${currentPoint.x} ${currentPoint.y} ${midPoint.x} ${midPoint.y}`);
-  }
-
-  const lastPoint = points[points.length - 1];
-  commands.push(`L ${lastPoint.x} ${lastPoint.y}`);
-
-  return commands.join(' ');
+  return buildStrokeSvgPath(points, strokeWidth);
 }
 
 function getCanvasLocalPoint(

@@ -1,0 +1,5 @@
+[functions.evaluate-kana-writing]
+verify_jwt = false
+
+[functions.evaluate-handwriting]
+verify_jwt = false
