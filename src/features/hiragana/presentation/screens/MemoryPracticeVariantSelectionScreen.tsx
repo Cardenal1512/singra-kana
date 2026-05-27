@@ -1,8 +1,9 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { MemoryPracticeVariant } from '@/src/features/hiragana/domain/models/MemoryPracticeVariant';
 import { getMascotImage } from '@/src/shared/assets/imageRegistry';
+import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
@@ -109,7 +110,7 @@ function VariantCard({
       ]}>
       <View style={[styles.imageFrame, { backgroundColor: accentColor }]}>
         {imageSource ? (
-          <Image resizeMode="contain" source={imageSource} style={styles.image} />
+          <AnimatedSingra mood="thinking" size={156} source={imageSource} />
         ) : null}
       </View>
       <View style={styles.copy}>

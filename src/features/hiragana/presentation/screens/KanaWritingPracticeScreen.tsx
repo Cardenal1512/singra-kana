@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -34,9 +33,11 @@ import { MemoryHandwritingCollagePreview } from '@/src/features/hiragana/present
 import { MemoryHandwritingEvaluationSummary } from '@/src/features/hiragana/presentation/components/MemoryHandwritingEvaluationSummary';
 import { ScreenHeader } from '@/src/features/hiragana/presentation/components/ScreenHeader';
 import { WritingSequenceReview } from '@/src/features/hiragana/presentation/components/WritingSequenceReview';
+import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { AppScreen } from '@/src/shared/components/AppScreen';
 import { CompletionModal } from '@/src/shared/components/CompletionModal';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
+import { SingraProgressBar } from '@/src/shared/components/SingraProgressBar';
 import { getMascotImage, getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { colors } from '@/src/shared/constants/colors';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
@@ -107,7 +108,6 @@ export function KanaWritingPracticeScreen({
   const [helpGuideVisible, setHelpGuideVisible] = useState(false);
   const [showSingraSolution, setShowSingraSolution] = useState(false);
   const [solutionKana, setSolutionKana] = useState('');
-  const [pendingNextIndex, setPendingNextIndex] = useState<number | undefined>();
   const [results, setResults] = useState<WritingPracticeResult[]>([]);
   const [memoryDrawings, setMemoryDrawings] = useState<MemoryHandwritingDrawing[]>([]);
   const [feedback, setFeedback] = useState<RelaxedWritingEvaluation | undefined>();
@@ -119,6 +119,7 @@ export function KanaWritingPracticeScreen({
   const [failedRemoteExampleImageKeys, setFailedRemoteExampleImageKeys] = useState<Record<string, true>>({});
   const practiceWidth = Math.min(width - screenPadding * 2, maxPracticeWidth);
   const canvasMaxSize = getCanvasMaxSize(width, height, practiceWidth);
+  const activeCanvasSide = canvasSize.width > 1 ? canvasSize.width : Math.min(practiceWidth, canvasMaxSize);
   const reviewWidth = Math.min(width - screenPadding * 2, maxReviewWidth);
   const isCompactReview = width < 720 || height < 780;
   const reviewMainWidth = reviewWidth;
@@ -140,7 +141,6 @@ export function KanaWritingPracticeScreen({
     setHelpGuideVisible(false);
     setShowSingraSolution(false);
     setSolutionKana('');
-    setPendingNextIndex(undefined);
     setResults([]);
     setMemoryDrawings([]);
     setHandwritingEvaluation(undefined);
@@ -236,35 +236,33 @@ export function KanaWritingPracticeScreen({
     const nextMemoryDrawings = saveMemoryDrawing(memoryDrawings);
     setResults(nextResults);
     setMemoryDrawings(nextMemoryDrawings);
-    setFeedback(evaluation);
+    const nextIndex = currentIndex + 1;
 
-    feedbackTimeoutRef.current = setTimeout(() => {
-      setFeedback(undefined);
+    if (!isTraceMode) {
+      if (solutionTimeoutRef.current) {
+        clearTimeout(solutionTimeoutRef.current);
+      }
 
-      const nextIndex = currentIndex + 1;
-      if (!isTraceMode) {
-        if (solutionTimeoutRef.current) {
-          clearTimeout(solutionTimeoutRef.current);
+      setSolutionKana(activeCharacter.kana);
+      setShowSingraSolution(true);
+      setHelpGuideVisible(false);
+      solutionTimeoutRef.current = setTimeout(() => {
+        setShowSingraSolution(false);
+
+        if (nextIndex >= practiceCharacters.length) {
+          finishPractice(nextMemoryDrawings);
+          return;
         }
 
-        setSolutionKana(activeCharacter.kana);
-        setPendingNextIndex(nextIndex < practiceCharacters.length ? nextIndex : undefined);
-        setShowSingraSolution(true);
-        setHelpGuideVisible(false);
-        solutionTimeoutRef.current = setTimeout(() => {
-          setShowSingraSolution(false);
+        setCurrentIndex(nextIndex);
+        setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
+      }, 2600);
+      return;
+    }
 
-          if (nextIndex >= practiceCharacters.length) {
-            finishPractice(nextMemoryDrawings);
-            return;
-          }
-
-          setCurrentIndex(nextIndex);
-          setUserStrokes(nextResults[nextIndex]?.userStrokes ?? []);
-          setPendingNextIndex(undefined);
-        }, 3000);
-        return;
-      }
+    setFeedback(evaluation);
+    feedbackTimeoutRef.current = setTimeout(() => {
+      setFeedback(undefined);
 
       if (nextIndex >= practiceCharacters.length) {
         finishPractice(nextMemoryDrawings);
@@ -297,7 +295,6 @@ export function KanaWritingPracticeScreen({
     setHelpGuideVisible(false);
     setShowSingraSolution(false);
     setSolutionKana('');
-    setPendingNextIndex(undefined);
     setResults([]);
     setMemoryDrawings([]);
     setHandwritingEvaluation(undefined);
@@ -438,35 +435,6 @@ export function KanaWritingPracticeScreen({
       });
   }
 
-  if (showSingraSolution) {
-    const nextKana =
-      pendingNextIndex === undefined ? undefined : practiceCharacters[pendingNextIndex]?.kana;
-
-    return (
-      <AppScreen background={<KawaiiBackground kana={['OK', solutionKana, nextKana ?? 'END']} />}>
-        <View style={[styles.solutionContent, { width: practiceWidth }]}>
-          <View style={styles.solutionCopy}>
-            <Text style={styles.solutionTitle}>
-              {language === 'es' ? 'La respuesta correcta' : 'Correct answer'}
-            </Text>
-            <Text style={styles.solutionSubtitle}>
-              {language === 'es' ? 'Singra te la enseña' : 'Singra shows you'}
-            </Text>
-          </View>
-
-          <View style={styles.solutionImageWrap}>
-            {solutionPanelImage ? (
-              <Image resizeMode="contain" source={solutionPanelImage} style={styles.solutionImage} />
-            ) : null}
-            <View style={styles.solutionBoardTextWrap}>
-              <Text style={styles.solutionKana}>{solutionKana}</Text>
-            </View>
-          </View>
-        </View>
-      </AppScreen>
-    );
-  }
-
   if (completed) {
     return (
       <AppScreen
@@ -569,6 +537,12 @@ export function KanaWritingPracticeScreen({
         </View>
       }>
       <View style={[styles.content, { width: practiceWidth }]}>
+        <SingraProgressBar
+          current={currentIndex + 1}
+          label={`${currentIndex + 1} / ${practiceCharacters.length}`}
+          total={practiceCharacters.length}
+        />
+
         <KanaPracticeHeader
           kana={activeCharacter.kana}
           romaji={activeCharacter.romaji}
@@ -591,6 +565,14 @@ export function KanaWritingPracticeScreen({
             onChangeCanvasSize={setCanvasSize}
             onChangeStrokes={handleChangeStrokes}
           />
+          {showSingraSolution ? (
+            <MemorySolutionFeedback
+              imageSource={solutionPanelImage}
+              kana={solutionKana}
+              label={language === 'es' ? 'Respuesta correcta' : 'Correct answer'}
+              size={activeCanvasSide}
+            />
+          ) : null}
         </View>
 
         {feedback ? (
@@ -731,6 +713,8 @@ type WritingFeedbackProps = {
 };
 
 function WritingFeedback({ category, mascotImage, message, singraMessage }: WritingFeedbackProps) {
+  const mood = category === 'almost' ? 'thinking' : category === 'good' ? 'idle' : 'happy';
+
   return (
     <View style={[styles.feedbackCard, styles[`feedbackCard_${category}`]]}>
       <View style={styles.feedbackParticles}>
@@ -739,12 +723,45 @@ function WritingFeedback({ category, mascotImage, message, singraMessage }: Writ
         <Text style={styles.feedbackParticle}>*</Text>
       </View>
       {mascotImage ? (
-        <Image resizeMode="contain" source={mascotImage} style={styles.feedbackMascot} />
+        <AnimatedSingra mood={mood} size={54} source={mascotImage} />
       ) : null}
       <View style={styles.feedbackCopy}>
         <Text style={styles.feedbackMessage}>{getFeedbackDisplay(message, category)}</Text>
         <Text style={styles.feedbackSingra}>{singraMessage}</Text>
       </View>
+    </View>
+  );
+}
+
+type MemorySolutionFeedbackProps = {
+  imageSource?: ImageSourcePropType;
+  kana: string;
+  label: string;
+  size: number;
+};
+
+function MemorySolutionFeedback({ imageSource, kana, label, size }: MemorySolutionFeedbackProps) {
+  const imageSize = Math.max(1, Math.round(size * 0.5));
+  const kanaFontSize = Math.max(24, Math.round(imageSize * 0.18));
+
+  return (
+    <View pointerEvents="none" style={[styles.memorySolutionOverlay, { height: size, width: size }]}>
+      <Text style={styles.memorySolutionLabel}>{label}</Text>
+      <View style={[styles.memorySolutionImageWrap, { height: imageSize, width: imageSize }]}>
+        {imageSource ? (
+          <AnimatedSingra mood="happy" size={imageSize} source={imageSource} />
+        ) : null}
+        <View style={styles.memorySolutionBoardTextWrap}>
+          <Text
+            style={[
+              styles.memorySolutionKana,
+              { fontSize: kanaFontSize, lineHeight: Math.round(kanaFontSize * 1.14) },
+            ]}>
+            {kana}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.memorySolutionFooterSpace} />
     </View>
   );
 }
@@ -771,11 +788,7 @@ export function ReviewMascotPanel({ compact, imageSource, isWide, width }: Revie
           styles.reviewMascotHalo,
           { height: imageSize + 18, width: imageSize + 18 },
         ]}>
-        <Image
-          source={imageSource}
-          resizeMode="contain"
-          style={{ height: imageSize, width: imageSize }}
-        />
+        <AnimatedSingra mood="idle" size={imageSize} source={imageSource} />
         <Text style={styles.reviewSparkle}>*</Text>
       </View>
       </FloatingView>
@@ -867,39 +880,41 @@ const styles = StyleSheet.create({
     right: 16,
     top: 18,
   },
-  solutionContent: {
+  memorySolutionOverlay: {
     alignItems: 'center',
     alignSelf: 'center',
-    gap: 18,
-    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    paddingBottom: 18,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    position: 'absolute',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 22,
+    top: 0,
+    elevation: 3,
   },
-  solutionCopy: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  solutionTitle: {
+  memorySolutionLabel: {
     color: colors.text,
-    fontSize: 24,
+    fontSize: 13,
     fontWeight: '900',
+    lineHeight: 17,
     textAlign: 'center',
   },
-  solutionSubtitle: {
-    color: colors.mutedText,
-    fontSize: 14,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  solutionImageWrap: {
-    aspectRatio: 1,
-    maxWidth: 360,
+  memorySolutionImageWrap: {
+    alignItems: 'center',
+    flexGrow: 0,
+    flexShrink: 1,
+    justifyContent: 'center',
     position: 'relative',
-    width: '82%',
   },
-  solutionImage: {
-    height: '100%',
-    width: '100%',
-  },
-  solutionBoardTextWrap: {
+  memorySolutionBoardTextWrap: {
     alignItems: 'center',
     height: '23%',
     justifyContent: 'center',
@@ -908,12 +923,13 @@ const styles = StyleSheet.create({
     top: '58%',
     width: '49%',
   },
-  solutionKana: {
+  memorySolutionKana: {
     color: colors.ink,
-    fontSize: 70,
     fontWeight: '900',
-    lineHeight: 82,
     textAlign: 'center',
+  },
+  memorySolutionFooterSpace: {
+    minHeight: 12,
   },
   backButton: {
     alignSelf: 'flex-start',
@@ -956,6 +972,7 @@ const styles = StyleSheet.create({
   },
   canvasArea: {
     alignItems: 'center',
+    position: 'relative',
   },
   strokeHint: {
     alignItems: 'center',

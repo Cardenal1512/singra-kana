@@ -1,5 +1,6 @@
-import { Image, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import { StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 
+import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -30,10 +31,10 @@ export function CompletionModal({
     <View style={[styles.card, compact ? styles.compactCard : null]}>
       <View style={[styles.halo, compact ? styles.compactHalo : null]}>
         {heroImageSource ? (
-          <Image
-            resizeMode="contain"
+          <AnimatedSingra
+            mood="happy"
+            size={compact ? 48 : 92}
             source={heroImageSource}
-            style={[styles.heroImage, compact ? styles.compactHeroImage : null]}
           />
         ) : (
           <Text style={[styles.mark, compact ? styles.compactMark : null]}>✓</Text>

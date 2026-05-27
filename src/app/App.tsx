@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from 'react-native';
 
 import { KanaTokenizerService } from '@/src/features/hiragana/application/services/KanaTokenizerService';
 import { CreateVocabularyDraftUseCase } from '@/src/features/hiragana/application/useCases/CreateVocabularyDraftUseCase';
@@ -38,6 +45,12 @@ import { MemoryPracticeVariantSelectionScreen } from '@/src/features/hiragana/pr
 import { PracticeModeSelectionScreen } from '@/src/features/hiragana/presentation/screens/PracticeModeSelectionScreen';
 import { RomajiQuizScreen } from '@/src/features/hiragana/presentation/screens/RomajiQuizScreen';
 import { VocabularyPracticeScreen } from '@/src/features/hiragana/presentation/screens/VocabularyPracticeScreen';
+import { createPinAuthRepository } from '@/src/features/user/infrastructure/repositories/createPinAuthRepository';
+import { createUserRepository, createUserSettingsRepository } from '@/src/features/user/infrastructure/repositories/createUserRepositories';
+import { ExpoLocalUserSessionStorage } from '@/src/features/user/infrastructure/storage/ExpoLocalUserSessionStorage';
+import { UserSessionProvider, useUserSession } from '@/src/features/user/presentation/context/UserSessionContext';
+import { PinLoginScreen } from '@/src/features/user/presentation/screens/PinLoginScreen';
+import { UserProfileScreen } from '@/src/features/user/presentation/screens/UserProfileScreen';
 import { getVocabularyImageUrl } from '@/src/infrastructure/supabase/storage/getVocabularyImageUrl';
 import { colors } from '@/src/shared/constants/colors';
 import { LanguageProvider } from '@/src/shared/i18n/useTranslation';
@@ -49,6 +62,7 @@ type WritingMode = Extract<PracticeMode, 'trace' | 'memory'>;
 type AppRoute =
   | { name: 'home' }
   | { name: 'addVocabulary' }
+  | { name: 'userProfile' }
   | { name: 'hiraganaSeries' }
   | { name: 'seriesPractice'; seriesId: string }
   | { name: 'practiceModes'; series: KanaSeries }
@@ -77,6 +91,10 @@ export default function SingraKanaApp() {
   );
   const vocabularyRepository = useMemo(() => createVocabularyRepository(), []);
   const vocabularyDraftRepository = useMemo(() => createVocabularyDraftRepository(), []);
+  const pinAuthRepository = useMemo(() => createPinAuthRepository(), []);
+  const userRepository = useMemo(() => createUserRepository(), []);
+  const userSettingsRepository = useMemo(() => createUserSettingsRepository(), []);
+  const localUserSessionStorage = useMemo(() => new ExpoLocalUserSessionStorage(), []);
   const writingTemplateRepository = useMemo(() => new LocalWritingTemplateRepository(), []);
   const handwritingEvaluationPort = useMemo(() => createHandwritingEvaluationPort(), []);
   const memoryHandwritingCollageService = useMemo(
@@ -175,16 +193,82 @@ export default function SingraKanaApp() {
     };
   }, [kanaCatalogRepository]);
 
+  const goBack = useCallback(() => {
+    if (route.name === 'home') {
+      return;
+    }
+
+    if (route.name === 'addVocabulary' || route.name === 'userProfile') {
+      setRoute({ name: 'home' });
+      return;
+    }
+
+    if (route.name === 'hiraganaSeries') {
+      setRoute({ name: 'home' });
+      return;
+    }
+
+    if (route.name === 'seriesPractice') {
+      setRoute({ name: 'hiraganaSeries' });
+      return;
+    }
+
+    if (route.name === 'practiceModes') {
+      setRoute({ name: 'hiraganaSeries' });
+      return;
+    }
+
+    if (route.name === 'flashcards') {
+      setRoute({ name: 'practiceModes', series: route.series });
+      return;
+    }
+
+    if (route.name === 'memoryPracticeVariant') {
+      setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice));
+      return;
+    }
+
+    if (route.name === 'writingPractice') {
+      setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice));
+      return;
+    }
+
+    if (route.name === 'romajiQuiz') {
+      setRoute(getPracticeBackRoute(route.series, route.fromSeriesPractice));
+      return;
+    }
+
+    if (route.name === 'vocabularyPractice') {
+      setRoute({ name: 'hiraganaSeries' });
+    }
+  }, [route]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <LanguageProvider>
-        <MotionStyleSheet />
-        <AnimatedRouteContainer routeKey={getRouteKey(route)}>
+      <UserSessionProvider
+        localUserSessionStorage={localUserSessionStorage}
+        pinAuthRepository={pinAuthRepository}
+        userRepository={userRepository}
+        userSettingsRepository={userSettingsRepository}
+      >
+        <LanguageProvider>
+          <MotionStyleSheet />
+          <SessionGate
+            isUserProfileRoute={route.name === 'userProfile'}
+            onOpenUserProfile={() => setRoute({ name: 'userProfile' })}
+            onReturnHome={() => setRoute({ name: 'home' })}
+            onSwipeBack={goBack}
+          >
+          <AnimatedRouteContainer routeKey={getRouteKey(route)}>
           {route.name === 'home' ? (
             <HomeScreen
               onOpenAddVocabulary={() => setRoute({ name: 'addVocabulary' })}
               onOpenHiragana={() => setRoute({ name: 'hiraganaSeries' })}
             />
+          ) : null}
+
+          {route.name === 'userProfile' ? (
+            <UserProfileScreen onBack={() => setRoute({ name: 'home' })} />
           ) : null}
 
           {route.name === 'addVocabulary' ? (
@@ -389,10 +473,81 @@ export default function SingraKanaApp() {
               onBack={() => setRoute({ name: 'hiraganaSeries' })}
             />
           ) : null}
-        </AnimatedRouteContainer>
-      </LanguageProvider>
+          </AnimatedRouteContainer>
+          </SessionGate>
+        </LanguageProvider>
+      </UserSessionProvider>
     </SafeAreaView>
   );
+}
+
+function SessionGate({
+  children,
+  isUserProfileRoute,
+  onOpenUserProfile,
+  onReturnHome,
+  onSwipeBack,
+}: {
+  children: ReactNode;
+  isUserProfileRoute: boolean;
+  onOpenUserProfile: () => void;
+  onReturnHome: () => void;
+  onSwipeBack: () => void;
+}) {
+  const { currentUser, isAuthenticated, isLoading, loginWithPin } = useUserSession();
+  const touchStartRef = useRef<{ pageX: number; pageY: number; time: number } | undefined>(undefined);
+
+  if (isLoading && !isAuthenticated) {
+    return <DataStateMessage label="Preparando tu sesión..." />;
+  }
+
+  if (!isAuthenticated) {
+    return <PinLoginScreen isLoading={isLoading} onSubmit={(pin) => loginWithPin(pin, 'adri')} />;
+  }
+
+  return (
+    <View
+      style={styles.authenticatedShell}
+      onTouchEnd={(event) => handleSwipeBackEnd(event, touchStartRef.current, onSwipeBack)}
+      onTouchStart={(event) => {
+        touchStartRef.current = {
+          pageX: event.nativeEvent.pageX,
+          pageY: event.nativeEvent.pageY,
+          time: Date.now(),
+        };
+      }}>
+      <View style={styles.userBadgePosition}>
+        <Pressable
+          accessibilityLabel="Abrir perfil"
+          accessibilityRole="button"
+          onPress={isUserProfileRoute ? onReturnHome : onOpenUserProfile}
+          style={({ pressed }) => [styles.userBadge, pressed ? styles.userBadgePressed : null]}>
+          <Text style={styles.userBadgeLabel}>
+            {isUserProfileRoute ? 'Volver' : `@${currentUser?.username ?? 'adri'}`}
+          </Text>
+        </Pressable>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function handleSwipeBackEnd(
+  event: GestureResponderEvent,
+  start: { pageX: number; pageY: number; time: number } | undefined,
+  onSwipeBack: () => void,
+) {
+  if (!start || start.pageX > 32) {
+    return;
+  }
+
+  const dx = event.nativeEvent.pageX - start.pageX;
+  const dy = event.nativeEvent.pageY - start.pageY;
+  const elapsed = Date.now() - start.time;
+
+  if (dx > 82 && Math.abs(dy) < 64 && elapsed < 800) {
+    onSwipeBack();
+  }
 }
 
 function getRouteKey(route: AppRoute) {
@@ -465,6 +620,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  authenticatedShell: {
+    flex: 1,
+  },
+  userBadgePosition: {
+    alignItems: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 12,
+    zIndex: 20,
+  },
+  userBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 34,
+    paddingHorizontal: 12,
+  },
+  userBadgeLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 32,
+  },
+  userBadgePressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.98 }],
   },
   stateContainer: {
     alignItems: 'center',

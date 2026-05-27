@@ -7,6 +7,7 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 
+import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { colors } from '@/src/shared/constants/colors';
 import type { Language } from '@/src/shared/i18n/translations';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
@@ -75,7 +76,9 @@ export function KanaPracticeHeader({
 
         {hasVisual ? (
           <View style={styles.visualColumn}>
-            {mascotImage ? <Image source={mascotImage} style={styles.mascotImage} /> : null}
+            {mascotImage ? (
+              <AnimatedSingra mood="idle" size={54} source={mascotImage} />
+            ) : null}
             {exampleImage ? (
               <View
                 style={[

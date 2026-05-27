@@ -1,6 +1,7 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { getMascotImage } from '@/src/shared/assets/imageRegistry';
+import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { SelectableCard } from '@/src/shared/components/SelectableCard';
 import { colors } from '@/src/shared/constants/colors';
@@ -15,7 +16,10 @@ type HomeScreenProps = {
   onOpenAddVocabulary: () => void;
 };
 
-export function HomeScreen({ onOpenAddVocabulary, onOpenHiragana }: HomeScreenProps) {
+export function HomeScreen({
+  onOpenAddVocabulary,
+  onOpenHiragana,
+}: HomeScreenProps) {
   const { height, isDesktop, isMobile, isTablet, width } = useResponsiveLayout();
   const { language, setLanguage, t } = useTranslation();
   const singraHomeImage = getMascotImage('singraHome');
@@ -81,12 +85,7 @@ export function HomeScreen({ onOpenAddVocabulary, onOpenHiragana }: HomeScreenPr
                       styles.mascotHalo,
                       { height: mascotSize + 18, width: mascotSize + 18 },
                     ]}>
-                    <Image
-                      accessibilityLabel={t.home.mascotLabel}
-                      resizeMode="contain"
-                      source={singraHomeImage}
-                      style={{ height: mascotSize, width: mascotSize }}
-                    />
+                    <AnimatedSingra mood="idle" size={mascotSize} source={singraHomeImage} />
                   </View>
                 </View>
               </FloatingView>

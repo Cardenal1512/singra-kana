@@ -1,4 +1,4 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
@@ -8,6 +8,7 @@ import type {
 } from '@/src/features/hiragana/domain/models/PracticeModeConfig';
 import { PracticeModeCard } from '@/src/features/hiragana/presentation/components/PracticeModeCard';
 import { getMascotImage, getModeImage } from '@/src/shared/assets/imageRegistry';
+import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii } from '@/src/shared/constants/visualSystem';
@@ -91,12 +92,7 @@ export function PracticeModeSelectionScreen({
                 { height: singraSize, width: singraSize },
               ]}>
               <FloatingView>
-                <Image
-                  accessibilityIgnoresInvertColors
-                  resizeMode="contain"
-                  source={singraImage}
-                  style={{ height: singraSize, width: singraSize }}
-                />
+                <AnimatedSingra mood="happy" size={singraSize} source={singraImage} />
               </FloatingView>
             </View>
           ) : null}

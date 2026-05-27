@@ -20,6 +20,7 @@ import type { VocabularyItem } from '@/src/features/hiragana/domain/models/Vocab
 import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
+import { SingraProgressBar } from '@/src/shared/components/SingraProgressBar';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
@@ -222,6 +223,12 @@ export function RomajiQuizScreen({
           subtitle={activeSeries.title}
           backLabel={t.common.back}
           onBack={onBack}
+        />
+
+        <SingraProgressBar
+          current={currentIndex + 1}
+          label={`${currentIndex + 1} / ${quizItems.length}`}
+          total={quizItems.length}
         />
 
         <View style={styles.quizKanaCard}>

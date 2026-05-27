@@ -23,6 +23,7 @@ import type {
 import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
+import { SingraProgressBar } from '@/src/shared/components/SingraProgressBar';
 import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -278,43 +279,51 @@ export function VocabularyPracticeScreen({
       <KawaiiBackground kana={['kotoba', currentItem.romaji, '\u3053\u3068\u3070']} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.questionContainer, { width: contentWidth }]}>
-        <TopBackButton label={t.common.back} onBack={onBack} />
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        style={styles.questionKeyboardAvoider}>
+        <ScrollView
+          contentContainerStyle={styles.questionScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={[styles.questionContainer, { width: contentWidth }]}>
+            <TopBackButton label={t.common.back} onBack={onBack} />
 
-        <View style={styles.progressPill}>
-          <Text style={styles.progressText}>
-            {currentIndex + 1} / {roundItems.length}
-          </Text>
-        </View>
+            <SingraProgressBar
+              current={currentIndex + 1}
+              label={`${currentIndex + 1} / ${roundItems.length}`}
+              total={roundItems.length}
+            />
 
-        <View style={styles.imageCard}>
-          <VocabularyImageView
-            failedRemoteImageIds={failedRemoteImageIds}
-            imageStyle={styles.heroImage}
-            item={currentItem}
-            onRemoteError={markRemoteImageFailed}
-          />
-        </View>
+            <View style={[styles.imageCard, isMobile ? styles.imageCardMobile : null]}>
+              <VocabularyImageView
+                failedRemoteImageIds={failedRemoteImageIds}
+                imageStyle={styles.heroImage}
+                item={currentItem}
+                onRemoteError={markRemoteImageFailed}
+              />
+            </View>
 
-        <View style={styles.answerPanel}>
-          <Text style={styles.prompt}>
-            {language === 'es' ? 'Escribe la palabra' : 'Type the word'}
-          </Text>
-          <TextInput
-            ref={inputRef}
-            autoCapitalize="none"
-            autoCorrect={false}
-            blurOnSubmit
-            onChangeText={setAnswer}
-            onSubmitEditing={submitAnswer}
-            placeholder={language === 'es' ? 'japones o romaji' : 'Japanese or romaji'}
-            placeholderTextColor={colors.disabledText}
-            returnKeyType="done"
-            style={styles.input}
-            value={answer}
-          />
-          <AppButton label={t.common.check} onPress={submitAnswer} />
-        </View>
+            <View style={styles.answerPanel}>
+              <Text style={styles.prompt}>
+                {language === 'es' ? 'Escribe la palabra' : 'Type the word'}
+              </Text>
+              <TextInput
+                ref={inputRef}
+                autoCapitalize="none"
+                autoCorrect={false}
+                blurOnSubmit
+                onChangeText={setAnswer}
+                onSubmitEditing={submitAnswer}
+                placeholder={language === 'es' ? 'japones o romaji' : 'Japanese or romaji'}
+                placeholderTextColor={colors.disabledText}
+                returnKeyType="done"
+                style={styles.input}
+                value={answer}
+              />
+              <AppButton label={t.common.check} onPress={submitAnswer} />
+            </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -689,24 +698,17 @@ const styles = StyleSheet.create({
   },
   questionContainer: {
     alignSelf: 'center',
-    flex: 1,
     gap: 12,
     justifyContent: 'center',
     padding: 16,
   },
-  progressPill: {
-    alignSelf: 'center',
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+  questionKeyboardAvoider: {
+    flex: 1,
   },
-  progressText: {
-    color: colors.mutedText,
-    fontSize: 13,
-    fontWeight: '900',
+  questionScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingBottom: 32,
   },
   imageCard: {
     alignItems: 'center',
@@ -718,6 +720,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 14,
     ...softShadow,
+  },
+  imageCardMobile: {
+    height: 230,
   },
   heroImage: {
     height: '100%',

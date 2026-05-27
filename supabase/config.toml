@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.evaluate-handwriting]
 verify_jwt = false
+
+[functions.login-with-pin]
+verify_jwt = false
