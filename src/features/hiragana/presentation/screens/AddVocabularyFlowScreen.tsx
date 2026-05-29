@@ -9,6 +9,7 @@ import type {
   VocabularyDraft,
 } from '@/src/features/hiragana/domain/models/VocabularyDraft';
 import type { VocabularyWritingSystem } from '@/src/features/hiragana/domain/models/WritingSystem';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
@@ -23,6 +24,7 @@ type AddVocabularyFlowScreenProps = {
     existingCandidates: DictionaryCandidate[],
   ) => Promise<DictionaryCandidate[]>;
   searchInitialCandidates: (query: string) => Promise<DictionaryCandidate[]>;
+  showBackButton?: boolean;
   tokenizeKana: (value: string) => string[];
   onBack: () => void;
 };
@@ -36,6 +38,7 @@ export function AddVocabularyFlowScreen({
   resolveKanaSeries,
   searchExternalCandidates,
   searchInitialCandidates,
+  showBackButton = true,
   tokenizeKana,
   onBack,
 }: AddVocabularyFlowScreenProps) {
@@ -203,7 +206,11 @@ export function AddVocabularyFlowScreen({
       <KawaiiBackground kana={['言', '仮', '語']} />
       <View style={[styles.content, { width: contentWidth }]}>
         <View style={styles.topBar}>
-          <AppButton label="Volver" onPress={onBack} size="compact" variant="secondary" />
+          {showBackButton ? (
+            <AppButton label="Volver" onPress={onBack} size="compact" variant="secondary" />
+          ) : (
+            <View />
+          )}
           <Text style={styles.stepLabel}>{getStepLabel(step)}</Text>
         </View>
 
@@ -280,7 +287,10 @@ export function AddVocabularyFlowScreen({
                   <Pressable
                     accessibilityRole="button"
                     key={kana}
-                    onPress={() => handleSelectKana(kana)}
+                    onPress={() => {
+                      playSound('tap');
+                      handleSelectKana(kana);
+                    }}
                     style={[styles.kanaOption, mainKana === kana ? styles.kanaOptionActive : null]}>
                     <Text
                       style={[
@@ -313,7 +323,10 @@ export function AddVocabularyFlowScreen({
                   <Pressable
                     accessibilityRole="button"
                     key={option}
-                    onPress={() => setWritingSystem(option)}
+                    onPress={() => {
+                      playSound('tap');
+                      setWritingSystem(option);
+                    }}
                     style={[styles.optionPill, writingSystem === option ? styles.optionPillActive : null]}>
                     <Text
                       style={[
@@ -386,10 +399,15 @@ function CandidateCard({
   selected: boolean;
   onPress: () => void;
 }) {
+  const handlePress = () => {
+    playSound('tap');
+    onPress();
+  };
+
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={handlePress}
       style={[styles.candidateCard, selected ? styles.candidateCardSelected : null]}>
       <Text style={styles.candidateJapanese}>{candidate.japanese}</Text>
       <View
@@ -481,11 +499,16 @@ function PrimaryAction({
   onPress: () => void;
   variant?: 'primary' | 'secondary';
 }) {
+  const handlePress = () => {
+    playSound('tap');
+    onPress();
+  };
+
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPress={onPress}
+      onPress={handlePress}
       style={[
         styles.primaryAction,
         variant === 'secondary' ? styles.secondaryAction : null,

@@ -13,6 +13,7 @@ import type {
 import { createUserStatsRepository } from '@/src/features/user/infrastructure/repositories/createUserStatsRepository';
 import { useUserSession } from '@/src/features/user/presentation/context/UserSessionContext';
 import { getMascotImage } from '@/src/shared/assets/imageRegistry';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
@@ -22,6 +23,7 @@ import { useTranslation } from '@/src/shared/i18n/useTranslation';
 import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 
 type UserProfileScreenProps = {
+  showBackButton?: boolean;
   onBack: () => void;
 };
 
@@ -31,7 +33,7 @@ type CompactUserDataItem = {
   value: string;
 };
 
-export function UserProfileScreen({ onBack }: UserProfileScreenProps) {
+export function UserProfileScreen({ showBackButton = true, onBack }: UserProfileScreenProps) {
   const { language } = useTranslation();
   const { currentUser, isFallback, logout } = useUserSession();
   const { isMobile, width } = useResponsiveLayout();
@@ -95,6 +97,7 @@ export function UserProfileScreen({ onBack }: UserProfileScreenProps) {
         <View style={[styles.content, { width: contentWidth }]}>
           <ProfileHeader
             language={language}
+            showBackButton={showBackButton}
             singraImage={singraImage}
             user={user}
             onBack={onBack}
@@ -113,7 +116,11 @@ export function UserProfileScreen({ onBack }: UserProfileScreenProps) {
 
           <ProgressSummaryCard language={language} stats={stats} user={user} />
 
+          <DailyGoalCard language={language} stats={stats} />
+
           <StatsGrid language={language} stats={stats} />
+
+          {hasStats ? <PracticeInsightsSection language={language} stats={stats} /> : null}
 
           {!hasStats ? (
             <EmptyStatsCard language={language} singraImage={singraImage} />
@@ -133,6 +140,11 @@ export function UserProfileScreen({ onBack }: UserProfileScreenProps) {
               },
               {
                 icon: '⏳',
+                label: language === 'es' ? 'Tiempo en app' : 'App time',
+                value: formatPracticeTime(stats.totalAppTimeSeconds, language),
+              },
+              {
+                icon: '⏱',
                 label: language === 'es' ? 'Ultima conexion' : 'Last seen',
                 value: formatDate(user?.lastSeenAt, language),
               },
@@ -160,20 +172,29 @@ export function UserProfileScreen({ onBack }: UserProfileScreenProps) {
 
 function ProfileHeader({
   language,
+  showBackButton,
   singraImage,
   user,
   onBack,
 }: {
   language: 'en' | 'es';
+  showBackButton: boolean;
   singraImage?: ReturnType<typeof getMascotImage>;
   user?: AppUser;
   onBack: () => void;
 }) {
+  const handleBack = () => {
+    playSound('tap');
+    onBack();
+  };
+
   return (
     <View style={styles.headerWrap}>
-      <Pressable accessibilityRole="button" onPress={onBack} style={styles.backPill}>
-        <Text style={styles.backPillText}>{language === 'es' ? 'Volver' : 'Back'}</Text>
-      </Pressable>
+      {showBackButton ? (
+        <Pressable accessibilityRole="button" onPress={handleBack} style={styles.backPill}>
+          <Text style={styles.backPillText}>{language === 'es' ? 'Volver' : 'Back'}</Text>
+        </Pressable>
+      ) : null}
 
       <View style={styles.profileHeaderCard}>
         <View style={styles.profileMain}>
@@ -255,8 +276,59 @@ function ProgressFact({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DailyGoalCard({ language, stats }: { language: 'en' | 'es'; stats: UserProfileStats }) {
+  const targetCopy = language === 'es'
+    ? `${stats.dailyGoal.sessionsToday}/${stats.dailyGoal.targetLessons} sesiones · ${stats.dailyGoal.minutesToday}/${stats.dailyGoal.targetMinutes} min`
+    : `${stats.dailyGoal.sessionsToday}/${stats.dailyGoal.targetLessons} sessions · ${stats.dailyGoal.minutesToday}/${stats.dailyGoal.targetMinutes} min`;
+
+  return (
+    <View style={styles.dailyGoalCard}>
+      <View style={styles.dailyGoalHeader}>
+        <View style={styles.dailyGoalBadge}>
+          <Text style={styles.dailyGoalBadgeText}>{stats.dailyGoal.completed ? 'OK' : 'GO'}</Text>
+        </View>
+        <View style={styles.dailyGoalCopy}>
+          <Text style={styles.dailyGoalTitle}>
+            {language === 'es' ? 'Objetivo de hoy' : 'Today goal'}
+          </Text>
+          <Text style={styles.dailyGoalSubtitle}>{targetCopy}</Text>
+        </View>
+      </View>
+
+      <View style={styles.goalBars}>
+        <GoalBar
+          label={language === 'es' ? 'Lecciones' : 'Lessons'}
+          percent={stats.dailyGoal.lessonsPercent}
+        />
+        <GoalBar
+          label={language === 'es' ? 'Minutos' : 'Minutes'}
+          percent={stats.dailyGoal.minutesPercent}
+        />
+      </View>
+
+      {stats.practiceTip ? (
+        <Text style={styles.practiceTip}>{stats.practiceTip}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function GoalBar({ label, percent }: { label: string; percent: number }) {
+  return (
+    <View style={styles.goalBarWrap}>
+      <View style={styles.goalBarLabelRow}>
+        <Text style={styles.goalBarLabel}>{label}</Text>
+        <Text style={styles.goalBarPercent}>{percent}%</Text>
+      </View>
+      <View style={styles.goalBarTrack}>
+        <View style={[styles.goalBarFill, { width: `${Math.max(4, percent)}%` }]} />
+      </View>
+    </View>
+  );
+}
+
 function StatsGrid({ language, stats }: { language: 'en' | 'es'; stats: UserProfileStats }) {
-  const accuracy = getProgressPercent(stats);
+  const accuracy = Math.round(stats.averageAccuracy);
 
   return (
     <View style={styles.statsGrid}>
@@ -284,6 +356,18 @@ function StatsGrid({ language, stats }: { language: 'en' | 'es'; stats: UserProf
         label={language === 'es' ? 'Precision media' : 'Average accuracy'}
         value={`${accuracy}%`}
       />
+      <StatMiniCard
+        backgroundColor="#F2EAF7"
+        icon="✓"
+        label={language === 'es' ? 'Aciertos' : 'Correct'}
+        value={`${stats.correctAttempts}/${stats.totalAttempts}`}
+      />
+      <StatMiniCard
+        backgroundColor="#FFF7DB"
+        icon="!"
+        label={language === 'es' ? 'Fallos' : 'Misses'}
+        value={String(stats.wrongAttempts)}
+      />
     </View>
   );
 }
@@ -304,6 +388,144 @@ function StatMiniCard({
       <Text style={styles.statIcon}>{icon}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function PracticeInsightsSection({
+  language,
+  stats,
+}: {
+  language: 'en' | 'es';
+  stats: UserProfileStats;
+}) {
+  return (
+    <View style={styles.insightsSection}>
+      <Text style={styles.compactTitle}>
+        {language === 'es' ? 'Detalles de práctica' : 'Practice details'}
+      </Text>
+
+      <View style={styles.kanaInsightGrid}>
+        <KanaInsightCard
+          kana={stats.strongestKana}
+          label={language === 'es' ? 'Más fuertes' : 'Strongest'}
+        />
+        <KanaInsightCard
+          kana={stats.weakestKana}
+          label={language === 'es' ? 'A reforzar' : 'Needs work'}
+        />
+      </View>
+
+      {stats.recommendedKana.length > 0 ? (
+        <View style={styles.recommendationCard}>
+          <Text style={styles.recommendationLabel}>
+            {language === 'es' ? 'Siguiente repaso' : 'Next review'}
+          </Text>
+          <View style={styles.kanaPillRow}>
+            {stats.recommendedKana.map((item) => (
+              <Text key={item} style={styles.kanaPill}>{item}</Text>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {stats.weeklyActivity.length > 0 ? (
+        <WeeklyActivityCard language={language} stats={stats} />
+      ) : null}
+
+      {stats.modeBreakdown.length > 0 ? (
+        <View style={styles.modeList}>
+          {stats.modeBreakdown.map((mode) => (
+            <View key={mode.mode} style={styles.modeRow}>
+              <View style={styles.modeCopy}>
+                <Text style={styles.modeTitle}>{formatModeLabel(mode.mode, language)}</Text>
+                <Text style={styles.modeSubtitle}>
+                  {mode.totalSessions} {language === 'es' ? 'sesiones' : 'sessions'} ·{' '}
+                  {formatPracticeTime(mode.durationSeconds, language)}
+                </Text>
+              </View>
+              <Text style={styles.modeAccuracy}>{mode.accuracy}%</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {stats.recentSessions.length > 0 ? (
+        <View style={styles.recentList}>
+          <Text style={styles.recentTitle}>
+            {language === 'es' ? 'Últimas sesiones' : 'Recent sessions'}
+          </Text>
+          {stats.recentSessions.map((session) => (
+            <View key={session.id} style={styles.recentRow}>
+              <View style={styles.modeCopy}>
+                <Text style={styles.modeTitle}>
+                  {session.seriesTitle ?? formatModeLabel(session.practiceMode, language)}
+                </Text>
+                <Text style={styles.modeSubtitle}>
+                  {formatDate(session.completedAt, language)}
+                </Text>
+              </View>
+              <Text style={styles.modeAccuracy}>
+                {session.totalAttempts > 0
+                  ? Math.round((session.correctAttempts / session.totalAttempts) * 100)
+                  : session.averageScore ?? 0}%
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function KanaInsightCard({ kana, label }: { kana: string[]; label: string }) {
+  return (
+    <View style={styles.kanaInsightCard}>
+      <Text style={styles.kanaInsightLabel}>{label}</Text>
+      <View style={styles.kanaPillRow}>
+        {kana.length > 0 ? kana.map((item) => (
+          <Text key={item} style={styles.kanaPill}>{item}</Text>
+        )) : <Text style={styles.emptyKanaInsight}>-</Text>}
+      </View>
+    </View>
+  );
+}
+
+function WeeklyActivityCard({
+  language,
+  stats,
+}: {
+  language: 'en' | 'es';
+  stats: UserProfileStats;
+}) {
+  const maxSessions = Math.max(1, ...stats.weeklyActivity.map((day) => day.totalSessions));
+
+  return (
+    <View style={styles.weeklyCard}>
+      <View style={styles.weeklyHeader}>
+        <Text style={styles.weeklyTitle}>
+          {language === 'es' ? 'Ultimos 7 dias' : 'Last 7 days'}
+        </Text>
+        <Text style={styles.weeklySubtitle}>
+          {stats.weeklyActivity.reduce((sum, day) => sum + day.totalSessions, 0)}{' '}
+          {language === 'es' ? 'sesiones' : 'sessions'}
+        </Text>
+      </View>
+      <View style={styles.weeklyBars}>
+        {stats.weeklyActivity.map((day) => (
+          <View key={day.date} style={styles.weeklyDay}>
+            <View style={styles.weeklyBarTrack}>
+              <View
+                style={[
+                  styles.weeklyBarFill,
+                  { height: `${Math.max(8, (day.totalSessions / maxSessions) * 100)}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.weeklyDayLabel}>{formatShortWeekday(day.date, language)}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -369,10 +591,30 @@ function getEmptyStats(user?: AppUser): UserProfileStats {
   return {
     totalPracticeSessions: user?.totalPracticeSessions ?? 0,
     totalPracticeTimeSeconds: user?.totalPracticeTimeSeconds ?? 0,
+    totalAppTimeSeconds: user?.totalAppTimeSeconds ?? 0,
+    totalAttempts: 0,
+    correctAttempts: 0,
+    wrongAttempts: 0,
     streakDays: user?.streakDays ?? 0,
     practicedKanaCount: 0,
     masteredKanaCount: 0,
     weakestKana: [],
+    strongestKana: [],
+    averageAccuracy: 0,
+    dailyGoal: {
+      sessionsToday: 0,
+      minutesToday: 0,
+      targetLessons: user?.dailyGoalLessons ?? 1,
+      targetMinutes: user?.dailyGoalMinutes ?? 10,
+      lessonsPercent: 0,
+      minutesPercent: 0,
+      completed: false,
+    },
+    weeklyActivity: [],
+    recommendedKana: [],
+    practiceTip: undefined,
+    modeBreakdown: [],
+    recentSessions: [],
   };
 }
 
@@ -418,6 +660,27 @@ function formatPracticeTime(seconds: number, language: 'en' | 'es') {
   const remainingMinutes = minutes % 60;
 
   return remainingMinutes > 0 ? `${hours} h ${remainingMinutes} min` : `${hours} h`;
+}
+
+function formatShortWeekday(dateKey: string, language: 'en' | 'es') {
+  try {
+    return new Intl.DateTimeFormat(language === 'es' ? 'es-ES' : 'en-US', {
+      weekday: 'short',
+    }).format(new Date(`${dateKey}T00:00:00.000Z`)).slice(0, 2);
+  } catch {
+    return dateKey.slice(5);
+  }
+}
+
+function formatModeLabel(mode: string, language: 'en' | 'es') {
+  const labels: Record<string, { en: string; es: string }> = {
+    'romaji-quiz': { en: 'Romaji quiz', es: 'Romaji' },
+    'vocabulary-image': { en: 'Vocabulary', es: 'Vocabulario' },
+    'writing-memory': { en: 'Memory writing', es: 'Memoria' },
+    'writing-trace': { en: 'Writing', es: 'Escritura' },
+  };
+
+  return labels[mode]?.[language] ?? mode;
 }
 
 const styles = StyleSheet.create({
@@ -606,6 +869,86 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
+  dailyGoalCard: {
+    backgroundColor: '#FFF7DB',
+    borderColor: '#E7B848',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+    ...softShadow,
+  },
+  dailyGoalHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dailyGoalBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  dailyGoalBadgeText: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  dailyGoalCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  dailyGoalTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  dailyGoalSubtitle: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  goalBars: {
+    gap: 8,
+  },
+  goalBarWrap: {
+    gap: 5,
+  },
+  goalBarLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  goalBarLabel: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  goalBarPercent: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  goalBarTrack: {
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    borderRadius: 999,
+    height: 12,
+    overflow: 'hidden',
+  },
+  goalBarFill: {
+    backgroundColor: '#F5B83B',
+    borderRadius: 999,
+    height: '100%',
+  },
+  practiceTip: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -636,6 +979,177 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 16,
     marginTop: 3,
+  },
+  insightsSection: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+    ...softShadow,
+  },
+  kanaInsightGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  kanaInsightCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    gap: 8,
+    minHeight: 86,
+    padding: 12,
+  },
+  kanaInsightLabel: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  kanaPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  kanaPill: {
+    backgroundColor: '#FFF0C8',
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: '900',
+    minWidth: 34,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    textAlign: 'center',
+  },
+  emptyKanaInsight: {
+    color: colors.disabledText,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  recommendationCard: {
+    backgroundColor: '#FFF7DB',
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 9,
+    padding: 12,
+  },
+  recommendationLabel: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  weeklyCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 12,
+    padding: 12,
+  },
+  weeklyHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  weeklyTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  weeklySubtitle: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  weeklyBars: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 8,
+    height: 92,
+  },
+  weeklyDay: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  weeklyBarTrack: {
+    alignItems: 'center',
+    backgroundColor: '#F4E6CC',
+    borderRadius: 999,
+    flex: 1,
+    justifyContent: 'flex-end',
+    minHeight: 58,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  weeklyBarFill: {
+    backgroundColor: '#F5B83B',
+    borderRadius: 999,
+    width: '100%',
+  },
+  weeklyDayLabel: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  modeList: {
+    gap: 8,
+  },
+  modeRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  modeCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  modeTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  modeSubtitle: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modeAccuracy: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  recentList: {
+    gap: 8,
+  },
+  recentTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  recentRow: {
+    alignItems: 'center',
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingTop: 8,
   },
   emptyStatsCard: {
     alignItems: 'center',

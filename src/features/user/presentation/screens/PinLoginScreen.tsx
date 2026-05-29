@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { playSound } from '@/src/shared/audio/AudioService';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -25,6 +26,8 @@ export function PinLoginScreen({ isLoading, onSubmit }: PinLoginScreenProps) {
   const canSubmit = pin.length >= 4 && !isSubmitting && !isLoading;
 
   async function handleSubmit() {
+    playSound('tap');
+
     if (!canSubmit) {
       return;
     }

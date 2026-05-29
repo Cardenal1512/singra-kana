@@ -8,6 +8,7 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 
+import { playSound } from '@/src/shared/audio/AudioService';
 import { colors } from '@/src/shared/constants/colors';
 import { radii } from '@/src/shared/constants/visualSystem';
 import { EnterView } from '@/src/shared/motion/EnterView';
@@ -41,6 +42,12 @@ export function PracticeModeCard({
 }: PracticeModeCardProps) {
   const [hovered, setHovered] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const handlePress = () => {
+    if (!disabled) {
+      playSound('tap');
+      onPress?.();
+    }
+  };
 
   return (
     <EnterView index={index} reducedMotion={prefersReducedMotion} style={{ width }}>
@@ -49,7 +56,7 @@ export function PracticeModeCard({
       disabled={disabled}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.card,
         { borderColor: accentColor, width },

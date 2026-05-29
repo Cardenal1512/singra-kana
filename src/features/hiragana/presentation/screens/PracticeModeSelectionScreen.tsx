@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { PracticeMode } from '@/src/features/hiragana/domain/models/PracticeMode';
@@ -8,6 +9,7 @@ import type {
 } from '@/src/features/hiragana/domain/models/PracticeModeConfig';
 import { PracticeModeCard } from '@/src/features/hiragana/presentation/components/PracticeModeCard';
 import { getMascotImage, getModeImage } from '@/src/shared/assets/imageRegistry';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
@@ -21,6 +23,7 @@ type PracticeModeSelectionScreenProps = {
   practiceModes: PracticeModeConfig[];
   series: KanaSeries;
   seriesOptions?: KanaSeries[];
+  showBackButton?: boolean;
   onBack: () => void;
   onSelectSeries?: (seriesId: string) => void;
   onSelectMode: (mode: PracticeMode) => void;
@@ -43,6 +46,7 @@ export function PracticeModeSelectionScreen({
   practiceModes,
   series,
   seriesOptions,
+  showBackButton = true,
   onBack,
   onSelectSeries,
   onSelectMode,
@@ -62,6 +66,33 @@ export function PracticeModeSelectionScreen({
   const singraImage = getMascotImage('singraGambate') ?? getMascotImage('singraHome');
   const showHeaderMascot = !isMobile && contentWidth >= 700;
   const singraSize = isDesktop ? 108 : isTablet ? 82 : 0;
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    contentOpacity.setValue(0.82);
+    contentTranslateY.setValue(6);
+
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentTranslateY, {
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [contentOpacity, contentTranslateY, series.id]);
+
+  const seriesContentMotion = {
+    opacity: contentOpacity,
+    transform: [{ translateY: contentTranslateY }],
+  };
 
   function handlePress(config: PracticeModeConfig) {
     if (!config.enabled || !config.mode) {
@@ -76,11 +107,19 @@ export function PracticeModeSelectionScreen({
       <KawaiiBackground kana={['あ', 'か', 'ま']} />
 
       <View style={[styles.content, { width: contentWidth }]}>
-        <View style={styles.topBar}>
-          <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>{`← ${t.common.back}`}</Text>
-          </Pressable>
-        </View>
+        {showBackButton ? (
+          <View style={styles.topBar}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                playSound('tap');
+                onBack();
+              }}
+              style={styles.backButton}>
+              <Text style={styles.backText}>{`← ${t.common.back}`}</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.heroArea}>
           {singraImage && showHeaderMascot ? (
@@ -97,10 +136,11 @@ export function PracticeModeSelectionScreen({
             </View>
           ) : null}
 
-          <View
+          <Animated.View
             style={[
               styles.headerFrame,
               isMobile ? styles.headerMobile : null,
+              seriesContentMotion,
             ]}>
             <View style={styles.header}>
               <Text style={[styles.title, isMobile ? styles.titleMobile : null]}>{title}</Text>
@@ -120,7 +160,7 @@ export function PracticeModeSelectionScreen({
               </View>
               <Text style={styles.subtitle}>{t.practiceModes.subtitle}</Text>
             </View>
-          </View>
+          </Animated.View>
 
           {seriesOptions && onSelectSeries ? (
             <SeriesSelector
@@ -131,14 +171,14 @@ export function PracticeModeSelectionScreen({
             />
           ) : null}
 
-          <View style={styles.modeSeparator}>
+          <Animated.View style={[styles.modeSeparator, seriesContentMotion]}>
             <View style={styles.separatorLine} />
             <Text style={styles.separatorMark}>さくら</Text>
             <View style={styles.separatorLine} />
-          </View>
+          </Animated.View>
         </View>
 
-        <View style={[styles.grid, { gap: gridGap }]}>
+        <Animated.View style={[styles.grid, { gap: gridGap }, seriesContentMotion]}>
           {practiceModes.map((config, index) => {
             const copy = t.practiceModes[config.titleKey];
 
@@ -158,7 +198,7 @@ export function PracticeModeSelectionScreen({
               />
             );
           })}
-        </View>
+        </Animated.View>
       </View>
     </ScrollView>
   );
@@ -190,7 +230,10 @@ function SeriesSelector({
             key={item.id}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            onPress={() => onSelectSeries(item.id)}
+            onPress={() => {
+              playSound('tap');
+              onSelectSeries(item.id);
+            }}
             style={[styles.seriesChip, active ? styles.seriesChipActive : null]}>
             <Text style={[styles.seriesCardTitle, active ? styles.seriesCardTitleActive : null]}>
               {getSeriesShortLabel(item, language)}

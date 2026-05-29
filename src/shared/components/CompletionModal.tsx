@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
+import type { ReactNode } from 'react';
 
 import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { AppButton } from '@/src/shared/components/AppButton';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { useTranslation } from '@/src/shared/i18n/useTranslation';
@@ -9,23 +12,39 @@ import { useTranslation } from '@/src/shared/i18n/useTranslation';
 type CompletionModalProps = {
   compact?: boolean;
   heroImageSource?: ImageSourcePropType;
+  insight?: ReactNode;
   nextLabel?: string;
+  nextDisabled?: boolean;
   onChangeMode: () => void;
   onNext: () => void;
   onRepeat: () => void;
+  onReviewFailures?: () => void;
+  repeatDisabled?: boolean;
   repeatLabel?: string;
+  reviewFailuresDisabled?: boolean;
+  reviewFailuresLabel?: string;
 };
 
 export function CompletionModal({
   compact = false,
   heroImageSource,
+  insight,
   nextLabel,
+  nextDisabled = false,
   onChangeMode,
   onNext,
   onRepeat,
+  onReviewFailures,
+  repeatDisabled = false,
   repeatLabel,
+  reviewFailuresDisabled = false,
+  reviewFailuresLabel,
 }: CompletionModalProps) {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    playSound('popup');
+  }, []);
 
   return (
     <View style={[styles.card, compact ? styles.compactCard : null]}>
@@ -48,9 +67,12 @@ export function CompletionModal({
         {compact ? null : <Text style={styles.subtitle}>{t.completion.subtitle}</Text>}
       </View>
 
+      {insight ? <View style={styles.insight}>{insight}</View> : null}
+
       <View style={[styles.actions, compact ? styles.compactActions : null]}>
         <View style={styles.action}>
           <AppButton
+            disabled={nextDisabled}
             label={nextLabel ?? t.common.next}
             onPress={onNext}
             size={compact ? 'compact' : 'regular'}
@@ -58,12 +80,24 @@ export function CompletionModal({
         </View>
         <View style={styles.action}>
           <AppButton
+            disabled={repeatDisabled}
             label={repeatLabel ?? t.common.repeat}
             onPress={onRepeat}
             size={compact ? 'compact' : 'regular'}
             variant="secondary"
           />
         </View>
+        {reviewFailuresLabel ? (
+          <View style={styles.action}>
+            <AppButton
+              disabled={reviewFailuresDisabled}
+              label={reviewFailuresLabel}
+              onPress={onReviewFailures ?? onRepeat}
+              size={compact ? 'compact' : 'regular'}
+              variant="secondary"
+            />
+          </View>
+        ) : null}
         <View style={styles.action}>
           <AppButton
             label={t.common.changeMode}
@@ -154,6 +188,9 @@ const styles = StyleSheet.create({
   actions: {
     alignSelf: 'stretch',
     gap: 10,
+  },
+  insight: {
+    alignSelf: 'stretch',
   },
   compactActions: {
     gap: 6,

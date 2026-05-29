@@ -16,6 +16,7 @@ export const defaultUser: AppUser = {
   totalPracticeDays: 0,
   totalPracticeSessions: 0,
   totalPracticeTimeSeconds: 0,
+  totalAppTimeSeconds: 0,
   createdAt: now,
   updatedAt: now,
 };

@@ -9,6 +9,7 @@ export async function getVocabularyItems(
   return activeItems.map((item) => ({
     item,
     images: item.images
+      .filter((image) => Boolean(image.imageUrl || image.imagePath || image.localAssetKey))
       .sort((first, second) => first.sortOrder - second.sortOrder),
   }));
 }

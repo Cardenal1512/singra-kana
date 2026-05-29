@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
 
 import { colors } from '@/src/shared/constants/colors';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { softTransition } from '@/src/shared/motion/motionStyles';
 import { usePrefersReducedMotion } from '@/src/shared/motion/usePrefersReducedMotion';
 
 type AppButtonProps = {
+  disabled?: boolean;
   label: string;
   onPress: () => void;
   size?: 'regular' | 'compact';
@@ -14,6 +16,7 @@ type AppButtonProps = {
 };
 
 export function AppButton({
+  disabled = false,
   label,
   onPress,
   size = 'regular',
@@ -21,25 +24,37 @@ export function AppButton({
 }: AppButtonProps) {
   const [hovered, setHovered] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const handlePress = () => {
+    if (disabled) {
+      return;
+    }
+
+    playSound('tap');
+    onPress();
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.button,
         size === 'compact' ? styles.compactButton : null,
         variant === 'secondary' ? styles.secondaryButton : styles.primaryButton,
-        hovered && !prefersReducedMotion ? styles.hovered : null,
-        pressed && !prefersReducedMotion ? styles.pressed : null,
+        disabled ? styles.disabledButton : null,
+        hovered && !disabled && !prefersReducedMotion ? styles.hovered : null,
+        pressed && !disabled && !prefersReducedMotion ? styles.pressed : null,
       ]}>
       <Text
         style={[
           styles.label,
           size === 'compact' ? styles.compactLabel : null,
           variant === 'secondary' ? styles.secondaryLabel : null,
+          disabled ? styles.disabledLabel : null,
         ]}>
         {label}
       </Text>
@@ -89,6 +104,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     shadowOpacity: 0.03,
   },
+  disabledButton: {
+    backgroundColor: colors.disabledSurface,
+    borderColor: colors.border,
+    opacity: 0.62,
+    shadowOpacity: 0,
+  },
   label: {
     color: colors.onPrimary,
     fontSize: 16,
@@ -99,6 +120,9 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     color: colors.text,
+  },
+  disabledLabel: {
+    color: colors.disabledText,
   },
   pressed: {
     opacity: 0.86,

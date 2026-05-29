@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { playSound } from '@/src/shared/audio/AudioService';
 import { colors } from '@/src/shared/constants/colors';
 import { radii, softShadow } from '@/src/shared/constants/visualSystem';
 import { EnterView } from '@/src/shared/motion/EnterView';
@@ -26,6 +27,14 @@ export function SelectableCard({
 }: SelectableCardProps) {
   const [hovered, setHovered] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const handlePress = () => {
+    if (!onPress) {
+      return;
+    }
+
+    playSound('tap');
+    onPress();
+  };
 
   return (
     <EnterView index={index} reducedMotion={prefersReducedMotion} style={width ? { width } : null}>
@@ -34,7 +43,7 @@ export function SelectableCard({
       disabled={disabled}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.card,
         width ? { width } : null,

@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { getMascotImage } from '@/src/shared/assets/imageRegistry';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { SelectableCard } from '@/src/shared/components/SelectableCard';
@@ -28,6 +30,10 @@ export function HomeScreen({
   const cardWidth = isMobile ? contentWidth : Math.floor((contentWidth - 24) / 3);
   const titleSize = isDesktop ? 50 : isTablet ? 44 : Math.min(38, Math.max(31, width * 0.09));
   const mascotSize = getMascotSize(width, height, isDesktop, isTablet);
+
+  useEffect(() => {
+    playSound('popup');
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -174,12 +180,17 @@ type LanguageOptionProps = {
 };
 
 function LanguageOption({ active, label, shortLabel, onPress }: LanguageOptionProps) {
+  const handlePress = () => {
+    playSound('tap');
+    onPress();
+  };
+
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      onPress={onPress}
+      onPress={handlePress}
       style={[styles.languageOption, active ? styles.languageOptionActive : null]}>
       <Text style={[styles.languageOptionText, active ? styles.languageOptionTextActive : null]}>
         {shortLabel}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
 import { radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -13,7 +14,9 @@ import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 
 type HiraganaSeriesScreenProps = {
   series: KanaSeries[];
+  showBackButton?: boolean;
   onBack: () => void;
+  onOpenMemory: () => void;
   onOpenVocabulary: () => void;
   onOpenSeriesPractice: () => void;
   onSelectRandom: () => void;
@@ -25,7 +28,9 @@ const cardGap = 12;
 
 export function HiraganaSeriesScreen({
   series,
+  showBackButton = true,
   onBack,
+  onOpenMemory,
   onOpenVocabulary,
   onOpenSeriesPractice,
   onSelectRandom,
@@ -41,9 +46,17 @@ export function HiraganaSeriesScreen({
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
       <KawaiiBackground kana={['\u3072', '\u3089', '\u306a']} />
       <View style={[styles.content, { width: contentWidth }]}>
-        <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>{`< ${t.common.back}`}</Text>
-        </Pressable>
+        {showBackButton ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              playSound('tap');
+              onBack();
+            }}
+            style={styles.backButton}>
+            <Text style={styles.backText}>{`< ${t.common.back}`}</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.header}>
           <Text style={styles.japaneseTitle}>{'\u3072\u3089\u304c\u306a'}</Text>
@@ -54,18 +67,16 @@ export function HiraganaSeriesScreen({
         <View style={[styles.choiceGrid, isMobile ? styles.choiceGridStacked : null]}>
           <HiraganaChoiceCard
             index={0}
-            kana={'\u4e71'}
-            title={t.hiragana.randomTitle}
-            subtitle={formatTranslation(t.hiragana.randomSubtitle, {
-              count: String(randomKanaCount),
-            })}
+            kana={'\u8a18'}
+            title="Modo memoria"
+            subtitle="Recuerda y escribe kana sin pistas"
             width={cardWidth}
-            onPress={onSelectRandom}
+            onPress={onOpenMemory}
           />
           <HiraganaChoiceCard
             index={1}
             kana={'\u5217'}
-            title={t.hiragana.seriesPracticeTitle}
+            title="Modo series"
             subtitle={t.hiragana.seriesPracticeSubtitle}
             width={cardWidth}
             onPress={onOpenSeriesPractice}
@@ -73,10 +84,20 @@ export function HiraganaSeriesScreen({
           <HiraganaChoiceCard
             index={2}
             kana={'\u8a00'}
-            title={t.hiragana.vocabularyTitle}
+            title="Modo vocabulario"
             subtitle={t.hiragana.vocabularySubtitle}
             width={cardWidth}
             onPress={onOpenVocabulary}
+          />
+          <HiraganaChoiceCard
+            index={3}
+            kana={'\u4e71'}
+            title="Modo aleatorio"
+            subtitle={formatTranslation(t.hiragana.randomSubtitle, {
+              count: String(randomKanaCount),
+            })}
+            width={cardWidth}
+            onPress={onSelectRandom}
           />
         </View>
       </View>
@@ -103,6 +124,10 @@ function HiraganaChoiceCard({
 }: HiraganaChoiceCardProps) {
   const [hovered, setHovered] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const handlePress = () => {
+    playSound('tap');
+    onPress();
+  };
 
   return (
     <EnterView index={index} reducedMotion={prefersReducedMotion} style={{ width }}>
@@ -110,7 +135,7 @@ function HiraganaChoiceCard({
       accessibilityRole="button"
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.choiceCard,
         { width },

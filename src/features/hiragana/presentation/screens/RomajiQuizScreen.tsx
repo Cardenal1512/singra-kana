@@ -16,10 +16,16 @@ import {
 import { checkRomajiAnswer } from '@/src/features/hiragana/application/useCases/checkRomajiAnswer';
 import type { KanaCharacter } from '@/src/features/hiragana/domain/models/KanaCharacter';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
+import type {
+  PracticeSessionInput,
+  PracticeSessionRecordResult,
+} from '@/src/features/hiragana/domain/models/PracticeSession';
 import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
 import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
+import { PracticeSessionInsightCard } from '@/src/shared/components/PracticeSessionInsightCard';
 import { SingraProgressBar } from '@/src/shared/components/SingraProgressBar';
 import { colors } from '@/src/shared/constants/colors';
 import { pastelColors, radii, softShadow } from '@/src/shared/constants/visualSystem';
@@ -28,8 +34,12 @@ import { useTranslation } from '@/src/shared/i18n/useTranslation';
 type RomajiQuizScreenProps = {
   getRemoteImageUrl: (fileName: string) => string | undefined;
   loadVocabularyByKana: (kana: string) => Promise<VocabularyItem[]>;
+  recordPracticeSession?: (
+    input: Omit<PracticeSessionInput, 'userId'>,
+  ) => Promise<PracticeSessionRecordResult>;
   series?: KanaSeries;
   seriesId: string;
+  showBackButton?: boolean;
   onBack: () => void;
   onNextSeries: () => void;
   onRepeatSeries: () => void;
@@ -47,15 +57,19 @@ type QuizAttempt = {
 export function RomajiQuizScreen({
   getRemoteImageUrl,
   loadVocabularyByKana,
+  recordPracticeSession,
   series: providedSeries,
   seriesId,
+  showBackButton = true,
   onBack,
   onNextSeries,
   onRepeatSeries,
 }: RomajiQuizScreenProps) {
   const { language, t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
+  const hasRecordedSessionRef = useRef(false);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const sessionStartedAtRef = useRef(new Date().toISOString());
   const series = providedSeries;
   const initialItems = useMemo(() => series?.characters ?? [], [series]);
   const [quizItems, setQuizItems] = useState<KanaCharacter[]>(initialItems);
@@ -65,6 +79,8 @@ export function RomajiQuizScreen({
   const [completed, setCompleted] = useState(false);
   const [resultAttempt, setResultAttempt] = useState<QuizAttempt | undefined>();
   const [correctedAllFailures, setCorrectedAllFailures] = useState(false);
+  const failures = attempts.filter((attempt) => !attempt.isCorrect);
+  const correctCount = attempts.filter((attempt) => attempt.isCorrect).length;
 
   useEffect(() => {
     setQuizItems(initialItems);
@@ -74,7 +90,52 @@ export function RomajiQuizScreen({
     setCompleted(false);
     setResultAttempt(undefined);
     setCorrectedAllFailures(false);
+    hasRecordedSessionRef.current = false;
+    sessionStartedAtRef.current = new Date().toISOString();
   }, [initialItems]);
+
+  useEffect(() => {
+    if (!completed || hasRecordedSessionRef.current || attempts.length === 0 || !recordPracticeSession || !series) {
+      return;
+    }
+
+    hasRecordedSessionRef.current = true;
+    const completedAt = new Date().toISOString();
+
+    void recordPracticeSession({
+      attempts: attempts.map((attempt, index) => ({
+        targetType: 'kana',
+        targetId: attempt.character.id,
+        kana: attempt.character.kana,
+        romaji: attempt.character.romaji,
+        expectedAnswer: attempt.correctAnswer,
+        userAnswer: attempt.userAnswer,
+        isCorrect: attempt.isCorrect,
+        score: attempt.isCorrect ? 100 : 0,
+        order: index,
+        metadata: {
+          exampleId: attempt.example?.id,
+          exampleJapanese: attempt.example?.japanese,
+        },
+      })),
+      averageScore: Math.round((correctCount / attempts.length) * 100),
+      completedAt,
+      correctAttempts: correctCount,
+      durationSeconds: getDurationSeconds(sessionStartedAtRef.current, completedAt),
+      metadata: {
+        correctedAllFailures,
+        language,
+        source: 'romaji-quiz-screen',
+      },
+      practiceMode: 'romaji-quiz',
+      seriesId: series.id,
+      seriesTitle: series.title,
+      startedAt: sessionStartedAtRef.current,
+      syllabary: 'hiragana',
+      totalAttempts: attempts.length,
+      wrongAttempts: attempts.length - correctCount,
+    });
+  }, [attempts, completed, correctCount, correctedAllFailures, language, recordPracticeSession, series]);
 
   useEffect(() => {
     if (!completed && !resultAttempt) {
@@ -98,7 +159,12 @@ export function RomajiQuizScreen({
       <View style={styles.root}>
         <KawaiiBackground />
         <View style={styles.quizContainer}>
-          <QuizHeader title="Series not found" backLabel={t.common.back} onBack={onBack} />
+          <QuizHeader
+            title="Series not found"
+            backLabel={t.common.back}
+            showBackButton={showBackButton}
+            onBack={onBack}
+          />
         </View>
       </View>
     );
@@ -106,8 +172,6 @@ export function RomajiQuizScreen({
 
   const activeSeries = series;
   const currentCharacter = quizItems[currentIndex];
-  const failures = attempts.filter((attempt) => !attempt.isCorrect);
-  const correctCount = attempts.filter((attempt) => attempt.isCorrect).length;
 
   async function checkAnswer() {
     if (resultAttempt) {
@@ -125,6 +189,7 @@ export function RomajiQuizScreen({
       userAnswer: answer.trim(),
     };
 
+    playSound(result.isCorrect ? 'success' : 'error');
     setAttempts((currentAttempts) => [...currentAttempts, attempt]);
     setResultAttempt(attempt);
     Keyboard.dismiss();
@@ -177,6 +242,8 @@ export function RomajiQuizScreen({
     setCompleted(false);
     setResultAttempt(undefined);
     setCorrectedAllFailures(cameFromFailures && nextItems.length > 0);
+    hasRecordedSessionRef.current = false;
+    sessionStartedAtRef.current = new Date().toISOString();
   }
 
   if (resultAttempt) {
@@ -198,10 +265,12 @@ export function RomajiQuizScreen({
         changeModeLabel={t.common.changeMode}
         correctedAllFailures={correctedAllFailures && failures.length === 0}
         correctCount={correctCount}
+        durationSeconds={getDurationSeconds(sessionStartedAtRef.current, new Date().toISOString())}
         language={language}
         nextLabel={language === 'es' ? 'Siguiente serie' : 'Next series'}
         repeatFailuresLabel={language === 'es' ? 'Repetir fallos' : 'Repeat misses'}
         repeatSeriesLabel={language === 'es' ? 'Repetir serie' : 'Repeat series'}
+        showBackButton={showBackButton}
         title={t.quiz.title}
         totalCount={attempts.length}
         onBack={onBack}
@@ -222,6 +291,7 @@ export function RomajiQuizScreen({
           title={t.quiz.title}
           subtitle={activeSeries.title}
           backLabel={t.common.back}
+          showBackButton={showBackButton}
           onBack={onBack}
         />
 
@@ -327,10 +397,12 @@ type QuizSummaryScreenProps = {
   changeModeLabel: string;
   correctedAllFailures: boolean;
   correctCount: number;
+  durationSeconds: number;
   language: 'en' | 'es';
   nextLabel: string;
   repeatFailuresLabel: string;
   repeatSeriesLabel: string;
+  showBackButton?: boolean;
   title: string;
   totalCount: number;
   onBack: () => void;
@@ -345,10 +417,12 @@ function QuizSummaryScreen({
   changeModeLabel,
   correctedAllFailures,
   correctCount,
+  durationSeconds,
   language,
   nextLabel,
   repeatFailuresLabel,
   repeatSeriesLabel,
+  showBackButton = true,
   title,
   totalCount,
   onBack,
@@ -363,7 +437,12 @@ function QuizSummaryScreen({
     <View style={styles.root}>
       <KawaiiBackground kana={['summary', 'OK', 'romaji']} />
       <View style={styles.summaryContainer}>
-        <QuizHeader title={title} backLabel={backLabel} onBack={onBack} />
+        <QuizHeader
+          title={title}
+          backLabel={backLabel}
+          showBackButton={showBackButton}
+          onBack={onBack}
+        />
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>
@@ -382,6 +461,14 @@ function QuizSummaryScreen({
             </Text>
           ) : null}
         </View>
+
+        <PracticeSessionInsightCard
+          correctCount={correctCount}
+          durationSeconds={durationSeconds}
+          failedKana={failures.map((failure) => failure.character.kana)}
+          language={language}
+          totalCount={totalCount}
+        />
 
         {failures.length > 0 ? (
           <ScrollView
@@ -434,17 +521,25 @@ function MissItem({ attempt, language }: { attempt: QuizAttempt; language: 'en' 
 
 type QuizHeaderProps = {
   backLabel: string;
+  showBackButton?: boolean;
   title: string;
   subtitle?: string;
   onBack: () => void;
 };
 
-function QuizHeader({ backLabel, title, subtitle, onBack }: QuizHeaderProps) {
+function QuizHeader({ backLabel, showBackButton = true, title, subtitle, onBack }: QuizHeaderProps) {
+  const handleBack = () => {
+    playSound('tap');
+    onBack();
+  };
+
   return (
     <View style={styles.quizHeader}>
-      <Pressable accessibilityRole="button" onPress={onBack} style={styles.quizBackButton}>
-        <Text style={styles.quizBackText}>{`< ${backLabel}`}</Text>
-      </Pressable>
+      {showBackButton ? (
+        <Pressable accessibilityRole="button" onPress={handleBack} style={styles.quizBackButton}>
+          <Text style={styles.quizBackText}>{`< ${backLabel}`}</Text>
+        </Pressable>
+      ) : null}
       <Text style={styles.quizTitle}>{title}</Text>
       {subtitle ? <Text style={styles.quizSubtitle}>{subtitle}</Text> : null}
     </View>
@@ -484,6 +579,10 @@ function getVocabularyImageFileName(imageKeyOrPath?: string) {
   }
 
   return fileName.includes('.') ? fileName : `${fileName}.webp`;
+}
+
+function getDurationSeconds(startedAt: string, completedAt: string) {
+  return Math.max(0, Math.round((Date.parse(completedAt) - Date.parse(startedAt)) / 1000));
 }
 
 const styles = StyleSheet.create({

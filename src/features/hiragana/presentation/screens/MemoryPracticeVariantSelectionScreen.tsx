@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { KanaSeries } from '@/src/features/hiragana/domain/models/KanaSeries';
 import type { MemoryPracticeVariant } from '@/src/features/hiragana/domain/models/MemoryPracticeVariant';
 import { getMascotImage } from '@/src/shared/assets/imageRegistry';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AnimatedSingra } from '@/src/shared/components/AnimatedSingra';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
 import { colors } from '@/src/shared/constants/colors';
@@ -11,6 +12,7 @@ import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 
 type MemoryPracticeVariantSelectionScreenProps = {
   series: KanaSeries;
+  showBackButton?: boolean;
   onBack: () => void;
   onSelectVariant: (variant: MemoryPracticeVariant) => void;
 };
@@ -20,6 +22,7 @@ const cardGap = 14;
 
 export function MemoryPracticeVariantSelectionScreen({
   series,
+  showBackButton = true,
   onBack,
   onSelectVariant,
 }: MemoryPracticeVariantSelectionScreenProps) {
@@ -36,9 +39,17 @@ export function MemoryPracticeVariantSelectionScreen({
       <KawaiiBackground kana={['memory', series.representativeKana, 'AI']} />
 
       <View style={[styles.content, { width: contentWidth }]}>
-        <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>{`<- ${t.common.back}`}</Text>
-        </Pressable>
+        {showBackButton ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              playSound('tap');
+              onBack();
+            }}
+            style={styles.backButton}>
+            <Text style={styles.backText}>{`<- ${t.common.back}`}</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.header}>
           <Text style={styles.title}>
@@ -99,10 +110,15 @@ function VariantCard({
   width,
   onPress,
 }: VariantCardProps) {
+  const handlePress = () => {
+    playSound('tap');
+    onPress();
+  };
+
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.card,
         { borderColor: accentColor, width },

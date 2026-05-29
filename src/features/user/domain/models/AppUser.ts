@@ -16,6 +16,7 @@ export type AppUser = {
   totalPracticeDays: number;
   totalPracticeSessions: number;
   totalPracticeTimeSeconds: number;
+  totalAppTimeSeconds: number;
   lastPracticedAt?: string;
   lastSeenAt?: string;
   createdAt: string;

@@ -19,6 +19,7 @@ export type SupabaseAppUserRow = {
   total_practice_days: number;
   total_practice_sessions: number;
   total_practice_time_seconds: number;
+  total_app_time_seconds?: number | null;
   last_practiced_at: string | null;
   last_seen_at: string | null;
   created_at: string;
@@ -51,6 +52,7 @@ export function mapSupabaseAppUserRowToDomain(row: SupabaseAppUserRow): AppUser 
     totalPracticeDays: row.total_practice_days,
     totalPracticeSessions: row.total_practice_sessions,
     totalPracticeTimeSeconds: row.total_practice_time_seconds,
+    totalAppTimeSeconds: row.total_app_time_seconds ?? 0,
     lastPracticedAt: row.last_practiced_at ?? undefined,
     lastSeenAt: row.last_seen_at ?? undefined,
     createdAt: row.created_at,

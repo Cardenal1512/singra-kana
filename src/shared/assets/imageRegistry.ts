@@ -5,6 +5,7 @@ export const mascotImages = {
   singraHome: require('@/assets/mascots/singra/singra-home.webp'),
   singraPanel: require('@/assets/mascots/singra/panel.webp'),
   singraSearch: require('@/assets/mascots/singra/singra-search.webp'),
+  singraStudy: require('@/assets/mascots/singra/singra-study.webp'),
   singraWithAi: require('@/assets/mascots/singra/singra-with-ai.webp'),
   singraWithoutAi: require('@/assets/mascots/singra/singra-without-ai.webp'),
 } satisfies Record<string, ImageSourcePropType>;

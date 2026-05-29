@@ -20,9 +20,15 @@ import type {
   VocabularyImage,
   VocabularyItemWithImages,
 } from '@/src/features/hiragana/domain/models/VocabularyImage';
+import type {
+  PracticeSessionInput,
+  PracticeSessionRecordResult,
+} from '@/src/features/hiragana/domain/models/PracticeSession';
 import type { VocabularyItem } from '@/src/features/hiragana/domain/models/VocabularyItem';
+import { playSound } from '@/src/shared/audio/AudioService';
 import { AppButton } from '@/src/shared/components/AppButton';
 import { KawaiiBackground } from '@/src/shared/components/KawaiiBackground';
+import { PracticeSessionInsightCard } from '@/src/shared/components/PracticeSessionInsightCard';
 import { SingraProgressBar } from '@/src/shared/components/SingraProgressBar';
 import { getVocabularyImage } from '@/src/shared/assets/imageRegistry';
 import { colors } from '@/src/shared/constants/colors';
@@ -36,6 +42,10 @@ import { useResponsiveLayout } from '@/src/shared/responsive/breakpoints';
 type VocabularyPracticeScreenProps = {
   getRemoteImageUrl: (fileName: string) => string | undefined;
   loadPracticeRound: (count: number) => Promise<VocabularyItemWithImages[]>;
+  recordPracticeSession?: (
+    input: Omit<PracticeSessionInput, 'userId'>,
+  ) => Promise<PracticeSessionRecordResult>;
+  showBackButton?: boolean;
   onBack: () => void;
 };
 
@@ -57,12 +67,16 @@ const countOptions = [5, 10, 20] as const;
 export function VocabularyPracticeScreen({
   getRemoteImageUrl,
   loadPracticeRound,
+  recordPracticeSession,
+  showBackButton = true,
   onBack,
 }: VocabularyPracticeScreenProps) {
   const { language, t } = useTranslation();
   const { isMobile, width } = useResponsiveLayout();
+  const hasRecordedSessionRef = useRef(false);
   const inputRef = useRef<TextInput>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const sessionStartedAtRef = useRef(new Date().toISOString());
   const [step, setStep] = useState<RoundStep>('setup');
   const [selectedCount, setSelectedCount] = useState<number>(5);
   const [roundItems, setRoundItems] = useState<VocabularyPracticeItem[]>([]);
@@ -90,6 +104,59 @@ export function VocabularyPracticeScreen({
   useEffect(() => {
     return () => clearResultTimer();
   }, []);
+
+  useEffect(() => {
+    if (step !== 'summary' || hasRecordedSessionRef.current || attempts.length === 0 || !recordPracticeSession) {
+      return;
+    }
+
+    hasRecordedSessionRef.current = true;
+    const completedAt = new Date().toISOString();
+
+    void recordPracticeSession({
+      attempts: attempts.map((attempt, index) => ({
+        targetType: 'vocabulary',
+        targetId: attempt.item.id,
+        kana: attempt.item.japanese,
+        romaji: attempt.item.romaji,
+        expectedAnswer: `${attempt.item.japanese}|${attempt.item.romaji}`,
+        userAnswer: attempt.userAnswer,
+        isCorrect: attempt.isCorrect,
+        score: attempt.isCorrect ? 100 : 0,
+        order: index,
+        metadata: {
+          category: attempt.item.category,
+          meaningEn: attempt.item.meaningEn,
+          meaningEs: attempt.item.meaningEs,
+        },
+      })),
+      averageScore: Math.round((correctCount / attempts.length) * 100),
+      completedAt,
+      correctAttempts: correctCount,
+      durationSeconds: getDurationSeconds(sessionStartedAtRef.current, completedAt),
+      metadata: {
+        cameFromFailures,
+        language,
+        repeatCount: selectedCount,
+        source: 'vocabulary-practice-screen',
+      },
+      practiceMode: 'vocabulary-image',
+      seriesId: 'vocabulary',
+      seriesTitle: language === 'es' ? 'Vocabulario' : 'Vocabulary',
+      startedAt: sessionStartedAtRef.current,
+      syllabary: 'hiragana',
+      totalAttempts: attempts.length,
+      wrongAttempts: attempts.length - correctCount,
+    });
+  }, [
+    attempts,
+    cameFromFailures,
+    correctCount,
+    language,
+    recordPracticeSession,
+    selectedCount,
+    step,
+  ]);
 
   async function startRandomRound(count = selectedCount) {
     if (isLoadingRound) {
@@ -132,6 +199,8 @@ export function VocabularyPracticeScreen({
     setCameFromFailures(fromFailures);
     setFailedRemoteImageIds({});
     setStep('question');
+    hasRecordedSessionRef.current = false;
+    sessionStartedAtRef.current = new Date().toISOString();
   }
 
   function markRemoteImageFailed(itemId: string) {
@@ -139,6 +208,32 @@ export function VocabularyPracticeScreen({
       ...currentFailedIds,
       [itemId]: true,
     }));
+
+    setRoundItems((currentItems) => {
+      const failedItemIndex = currentItems.findIndex((item) => item.id === itemId);
+      const failedItem = currentItems[failedItemIndex];
+
+      if (!failedItem || failedItem.localImageSource) {
+        return currentItems;
+      }
+
+      const nextItems = currentItems.filter((item) => item.id !== itemId);
+
+      if (nextItems.length === 0) {
+        setCurrentIndex(0);
+        return [];
+      }
+
+      setCurrentIndex((index) => {
+        if (failedItemIndex < index) {
+          return Math.max(0, index - 1);
+        }
+
+        return Math.min(index, nextItems.length - 1);
+      });
+
+      return nextItems;
+    });
   }
 
   function submitAnswer() {
@@ -153,6 +248,7 @@ export function VocabularyPracticeScreen({
       userAnswer: answer.trim(),
     };
 
+    playSound(result.isCorrect ? 'success' : 'error');
     setAttempts((currentAttempts) => [...currentAttempts, attempt]);
     setResultAttempt(attempt);
     setStep('result');
@@ -189,7 +285,7 @@ export function VocabularyPracticeScreen({
       <View style={styles.root}>
         <KawaiiBackground kana={['kotoba', 'kana', 'hiragana']} />
         <View style={[styles.setupContainer, { width: contentWidth }]}>
-          <TopBackButton label={t.common.back} onBack={onBack} />
+          {showBackButton ? <TopBackButton label={t.common.back} onBack={onBack} /> : null}
 
           <View style={styles.setupHeader}>
             <Text style={styles.japaneseTitle}>{'\u3053\u3068\u3070'}</Text>
@@ -250,6 +346,7 @@ export function VocabularyPracticeScreen({
         attempts={attempts}
         cameFromFailures={cameFromFailures}
         correctCount={correctCount}
+        durationSeconds={getDurationSeconds(sessionStartedAtRef.current, new Date().toISOString())}
         language={language}
         repeatCount={selectedCount}
         totalCount={attempts.length}
@@ -265,7 +362,7 @@ export function VocabularyPracticeScreen({
       <View style={styles.root}>
         <KawaiiBackground />
         <View style={[styles.setupContainer, { width: contentWidth }]}>
-          <TopBackButton label={t.common.back} onBack={onBack} />
+          {showBackButton ? <TopBackButton label={t.common.back} onBack={onBack} /> : null}
           <Text style={styles.title}>
             {language === 'es' ? 'No hay vocabulario disponible' : 'No vocabulary available'}
           </Text>
@@ -286,7 +383,7 @@ export function VocabularyPracticeScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={[styles.questionContainer, { width: contentWidth }]}>
-            <TopBackButton label={t.common.back} onBack={onBack} />
+            {showBackButton ? <TopBackButton label={t.common.back} onBack={onBack} /> : null}
 
             <SingraProgressBar
               current={currentIndex + 1}
@@ -344,6 +441,10 @@ function CountCard({
 }) {
   const [hovered, setHovered] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const handlePress = () => {
+    playSound('tap');
+    onPress();
+  };
 
   return (
     <EnterView index={index} reducedMotion={prefersReducedMotion}>
@@ -352,7 +453,7 @@ function CountCard({
       accessibilityState={{ selected }}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.countCard,
         selected ? styles.countCardSelected : null,
@@ -414,6 +515,7 @@ function VocabularySummaryScreen({
   attempts,
   cameFromFailures,
   correctCount,
+  durationSeconds,
   language,
   repeatCount,
   totalCount,
@@ -424,6 +526,7 @@ function VocabularySummaryScreen({
   attempts: VocabularyAttempt[];
   cameFromFailures: boolean;
   correctCount: number;
+  durationSeconds: number;
   language: 'en' | 'es';
   repeatCount: number;
   totalCount: number;
@@ -458,6 +561,14 @@ function VocabularySummaryScreen({
             </Text>
           ) : null}
         </View>
+
+        <PracticeSessionInsightCard
+          correctCount={correctCount}
+          durationSeconds={durationSeconds}
+          failedKana={failures.map((failure) => failure.item.japanese)}
+          language={language}
+          totalCount={totalCount}
+        />
 
         {failures.length > 0 ? (
           <ScrollView
@@ -555,8 +666,13 @@ function VocabularyImageView({
 }
 
 function TopBackButton({ label, onBack }: { label: string; onBack: () => void }) {
+  const handlePress = () => {
+    playSound('tap');
+    onBack();
+  };
+
   return (
-    <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
+    <Pressable accessibilityRole="button" onPress={handlePress} style={styles.backButton}>
       <Text style={styles.backText}>{`< ${label}`}</Text>
     </Pressable>
   );
@@ -610,6 +726,10 @@ function getVocabularyImageFileName(image: VocabularyImage): string | undefined 
   }
 
   return fileName.includes('.') ? fileName : `${fileName}.webp`;
+}
+
+function getDurationSeconds(startedAt: string, completedAt: string) {
+  return Math.max(0, Math.round((Date.parse(completedAt) - Date.parse(startedAt)) / 1000));
 }
 
 const styles = StyleSheet.create({
